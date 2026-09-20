@@ -7,6 +7,8 @@
     "test:anki": "npm run test:anki:unit && npm run test:anki:integration && npm run test:anki:e2e",
     "test:anki:unit": "node --test tests/anki/unit/*.test.js",
     "test:anki:integration": "npm run build --silent && node --test tests/anki/integration/*.test.js",
+    "test:anki:build": "npm run build && npm run build:firefox && node scripts/verify-anki-builds.mjs",
+    "test:anki:release": "npm run test:anki && npm run build:firefox && node scripts/verify-anki-builds.mjs",
     "test:anki:e2e": "node --test tests/anki/e2e/*.test.js"
   },
   "devDependencies": {

@@ -1,0 +1,49 @@
+name: Anki phase one
+
+on:
+  push:
+    paths:
+      - '.github/workflows/anki.yml'
+      - 'background.js'
+      - 'manifest*.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/verify-anki-builds.mjs'
+      - 'src/anki/**'
+      - 'src/options/**'
+      - 'src/popup/**'
+      - 'src/service/a4_tooltip_new.js'
+      - 'src/service/a5_custom_word_selection.js'
+      - 'tests/anki/**'
+      - 'webpack*.config.js'
+  pull_request:
+    paths:
+      - '.github/workflows/anki.yml'
+      - 'background.js'
+      - 'manifest*.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/verify-anki-builds.mjs'
+      - 'src/anki/**'
+      - 'src/options/**'
+      - 'src/popup/**'
+      - 'src/service/a4_tooltip_new.js'
+      - 'src/service/a5_custom_word_selection.js'
+      - 'tests/anki/**'
+      - 'webpack*.config.js'
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:anki:release

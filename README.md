@@ -133,6 +133,16 @@ Read the [LingKuma Wiki](https://docs.lingkuma.org) for installation, basic usag
 
 More surprises are waiting for you to discover ✨
 
+## Anki capture
+
+After one setup in **Options → Anki Capture**, an intentional word or phrase lookup is saved locally and written to a dedicated `LingKuma Lookup v1` note in the selected local Anki deck. Repeating the same context reopens the same capture; the same term in a different context creates a separate note. No per-word save or confirmation click is required.
+
+Anki may be offline: committed local work remains queued and resumes automatically. The capture manager supports search, editing, conflict/missing-note handling, stop/resume management, and versioned backup/restore. Optional pronunciation is attached only when the configured channel can export real audio bytes; text delivery does not depend on audio.
+
+Anki remains responsible for review scheduling, AnkiWeb, and cross-device sync. LingKuma does not call sync, alter review fields, or promise CAS-safe concurrent edits across two unsynchronized Anki collections.
+
+See the [Anki operation guide](./docs/anki-phase1/USER_GUIDE.md) and [developer/release guide](./docs/anki-phase1/DEVELOPMENT.md).
+
 ## Sync server / self-hosting
 
 - [Docker deployment guide](./server/readme.md)

@@ -23,11 +23,11 @@
 | T14 | PASS | 本任务提交 | `npm run test:anki`：unit 64/64、integration 47/47、e2e 1/1；Chromium最终短语一次保存，网页/EPUB/PDF/字幕/iframe真实选区均持久化 | 外部阅读器与真实Anki自动写入合并验收留T20 |
 | T15 | PASS | 本任务提交 | `npm run test:anki`：unit 67/67、integration 52/52、e2e 1/1；Supertone真实协议适配、内容哈希媒体、文字先写、上传中断复用及旧voice结果隔离通过 | 未消耗用户Supertone额度；真实Anki媒体播放留T20专用测试数据 |
 | T16 | PASS | 本任务提交 | `npm run test:anki`：unit 67/67、integration 57/57、e2e 1/1；管理搜索/分页/分组、编辑、冲突/缺失/多匹配、打开关联、停止/恢复通过；Chromium验证最终管理页 | 真实Anki上的管理全链留T20；浏览器UI使用受控后台DTO，未修改用户数据 |
-| T17 | PASS | `6845a3e` | `npm run test:anki`：unit 67/67、integration 60/60、e2e 1/1；接管、巡检、重绑定及管理核对通过；Chromium验证最终核对入口 | 六小时间隔以受控时钟推进；真实Anki外部编辑/删除留T20 |
-| T18 | PASS | `2b08002` | `npm run test:anki`：unit 67/67、integration 64/64、e2e 1/1；版本化备份、严格校验、安全合并及媒体恢复通过；Chromium验证最终导入导出入口 | 未写用户下载目录或真实Anki媒体；Firefox未安装 |
+| T17 | PASS | `277ab52` | `npm run test:anki`：unit 67/67、integration 60/60、e2e 1/1；接管、巡检、重绑定及管理核对通过；Chromium验证最终核对入口 | 六小时间隔以受控时钟推进；真实Anki外部编辑/删除留T20 |
+| T18 | PASS | `99c584c` | `npm run test:anki`：unit 67/67、integration 64/64、e2e 1/1；版本化备份、严格校验、安全合并及媒体恢复通过；Chromium验证最终导入导出入口 | 未写用户下载目录或真实Anki媒体；Firefox未安装 |
 | T19 | PASS | 本任务提交 | `npm run test:anki`：unit 74/74、integration 64/64、e2e 1/1；安全targeted 42/42；Chromium验证最终敏感选择守卫和单监听 | 未在真实密码管理器输入凭证；Firefox未安装 |
 | T20 | PASS | 本任务提交 | 全套unit 74/74、integration 67/67、e2e 1/1+真实A49 1/1；真实AnkiConnect 6专用牌组链路、500条离线队列、三类写入三断点、Firefox 156实际加载 | 未调用真实AI/发音付费渠道，未做真实Reviewer播放、人工复习后更新或系统睡眠 |
-| T21 | TODO | — | — | — |
+| T21 | PASS | 本任务提交 | `npm ci`; `npm run test:anki:release`：unit 74/74、integration 67/67、e2e 1/1+real skip、双浏览器clean build及产物门禁通过；Firefox 156/Chromium最终产物加载 | 真实付费AI/音频、品牌Chrome/Edge人工加载等环境项继续明确未运行 |
 
 ## 单任务交付模板
 
@@ -295,6 +295,18 @@ A00～A13证据：T00～T05的基线、固定向量、事务/API/模板自动化
 回归检查：真实验收未使用用户现有牌组/类型或删除非本轮笔记；专用牌组最终为空。生产客户端仍拒绝createDeck/deleteNotes/cardsInfo等测试专用action，测试清理通过隔离harness直接调用，不扩大扩展权限。Chromium/Firefox输出目录和后台清单分离；常规build仍生成Chromium service worker。现有provider、Known、AnkiWeb同步和复习排程均未修改。
 提交：本任务提交。
 下一任务：T21，交付文档、可复验命令和最终回归门。
+
+### T21
+
+实际基线：产品行为、架构和任务证据完整，但README没有Anki入口；文档包仍声称“待实现”，旧PACK_VALIDATION只核对原始任务包。没有面向用户的一次设置/状态/冲突/备份/多设备说明，没有开发者模块/schema/API/脱敏诊断手册，也没有稳定的双浏览器产物门或Anki CI。
+修改文件：`README.md`、`README.zh.md`、`docs/anki-phase1/USER_GUIDE.md`、`docs/anki-phase1/DEVELOPMENT.md`、`docs/anki-phase1/PACK_VALIDATION.md`、`docs/anki-phase1/START_HERE.md`、`scripts/verify-anki-builds.mjs`、`package.json`、`.github/workflows/anki.yml`、本记录。
+行为变化：英文/中文README新增Anki自动摘录入口。用户手册说明一次性设置、零逐词保存、重复/新语境、全部状态、可选音频、冲突/缺失、停止/恢复管理、备份恢复、Anki职责和多机非CAS边界。开发手册记录最小模块边界、IndexedDB/schema身份、严格消息与生产action白名单、双浏览器构建、真实Anki安全命令和脱敏信息。新增`test:anki:build`及最终`test:anki:release`门禁；产物脚本核对两套manifest、关键bundle和options/popup单次加载。GitHub Actions在相关路径变化时使用Node 24、`npm ci`并运行同一release门，不访问真实Anki或付费服务。
+测试命令：`npm ci`；`npm run test:anki:release`；`web-ext run --source-dir dist-firefox`在Firefox 156加载最终clean build；`browser-use`加载最终`dist/src/options/options.html#anki`并打开Anki面板。
+实际结果：锁定依赖从空安装187个包成功。release门unit 74/74、integration 67/67、默认e2e 1/1通过，真实A49按设计skip 1；Chromium和Firefox两个clean build成功，仅有既有包体积warning；产物门返回`verified:true`，证明Chromium service worker、Firefox background scripts、关键Anki页面/bundle及单次options/popup脚本。最终Firefox产物在官方156.0再次临时安装成功，日志只有Installed且无moz-extension/WebExt/Syntax错误。最终Chromium页面显示标题Options、Anki摘录面板可打开且options.js为1份。A50的新环境命令、一次设置步骤、零额外保存行为和环境限制已有可执行文档；一次设置→真实Anki链由A49证明，UI文案与手册逐项核对。
+未运行的验收：T20最终记录中的真实付费AI/音频、外部reader应用、人工复习、系统睡眠和品牌Chrome/Edge人工加载仍保持未运行，没有因文档/CI完成改写状态。CI workflow只在本地按其实际命令验证，尚未由本提交触发GitHub托管runner。
+回归检查：CI不要求秘密或用户数据；真实Anki测试仍需显式环境变量且默认skip。发布脚本只读构建产物，不修改源码或用户环境。文档不承诺AnkiWeb同步、跨未同步collection全局唯一、CAS级并发安全或所有播放渠道均可导出音频。T00～T21全部完成，一期实现和可重复交付门闭合。
+提交：本任务提交。
+下一任务：无；一期T00～T21完成。
 
 ## 最终真实环境验收
 
