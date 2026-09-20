@@ -8,7 +8,7 @@
 |---|---|---|---|---|
 | T00 | PASS | 本任务提交 | `npm ci`; `npm run build`; `node scripts/probe-ankiconnect.mjs`; 入口/AI/TTS/浏览器审计见 BASELINE.md、CAPABILITIES.md | AnkiConnect不可达；Firefox未安装；真实音频导出未运行 |
 | T01 | PASS | 本任务提交 | `npm run test:anki`（6/6）；连续构建；watch重编译；Chromium 150加载dist并核实后台listener、content facade | Firefox未安装；正式Chrome 153自动加载受发行版命令行限制，使用同机Chromium实测 |
-| T02 | TODO | — | — | — |
+| T02 | PASS | 本任务提交 | `npm run test:anki`：14组固定identity vectors及offset/Unicode/message边界全部通过 | 无 |
 | T03 | TODO | — | — | — |
 | T04 | TODO | — | — | — |
 | T05 | TODO | — | — | — |
@@ -66,6 +66,18 @@
 回归检查：遗留 output/module 设置未全局改变；动态脚本原顺序保留；foreign message 测试证明新 listener 不抢答遗留消息；构建仍仅有原有两个体积警告。
 提交：本任务提交。
 下一任务：T02，冻结数据契约和确定性摘录身份。
+
+### T02
+
+实际基线：T01 已通过，隔离模块和测试命令可用。
+修改文件：`src/anki/contracts.js`、`src/anki/identity.js`、`tests/anki/unit/contracts.test.js`、`tests/anki/unit/identity.test.js`、本记录。
+行为变化：冻结 origin snapshot、消息外壳、错误码、Anki字段顺序、来源类型和输入上限；实现 NFC/空白规范化、UTF-16位置核验、固定tuple、SHA-256及 `lk1_` identity。
+测试命令：`npm run test:anki:unit`；`npm run test:anki`。
+实际结果：unit 26/26（含14组外部固定向量）通过，integration 2/2、e2e 1/1通过；相同规范化语境命中相同ID，不同位置/大小写/selection source产生不同ID。
+未运行的验收：无；本任务为纯函数边界。
+回归检查：构建成功且仍仅有原有体积警告；无DOM、网络、存储或Anki副作用。
+提交：本任务提交。
+下一任务：T03，实现事务化本地记录和工作队列。
 
 ## 最终真实环境验收
 
