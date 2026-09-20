@@ -1,3 +1,7 @@
+const { initializeAnkiRuntime } = require('./src/anki/runtime');
+
+initializeAnkiRuntime({ browserApi: chrome });
+
 const dbName = 'vocabDB';
 const dbVersion = 3; // 升级版本以添加isCustom索引
 let db;
@@ -42,6 +46,7 @@ const HIGHLIGHT_RUNTIME_FILES = [
   'src/plugin/min/de-compromise.min.js',
   'src/utils/language-detector/eld.extrasmall.global.js',
   'src/plugin/pos-highlight.js',
+  'src/anki/content.js',
   'src/service/a3_aiFragen.js',
   'src/service/a4_tooltip_new.js',
   'src/service/a5_custom_word_selection.js',

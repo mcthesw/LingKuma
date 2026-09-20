@@ -2,7 +2,11 @@
   "scripts": {
     "build": "webpack --config webpack.config.js",
     "watch": "webpack --watch --config webpack.config.js",
-    "pack": "npm run build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pack-crx.ps1"
+    "pack": "npm run build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pack-crx.ps1",
+    "test:anki": "npm run test:anki:unit && npm run test:anki:integration && npm run test:anki:e2e",
+    "test:anki:unit": "node --test tests/anki/unit/*.test.js",
+    "test:anki:integration": "npm run build --silent && node --test tests/anki/integration/*.test.js",
+    "test:anki:e2e": "node --test tests/anki/e2e/*.test.js"
   },
   "devDependencies": {
     "clean-webpack-plugin": "^4.0.0",

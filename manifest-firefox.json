@@ -12,6 +12,7 @@
   },
   "permissions": [
     "activeTab",
+    "alarms",
     "tts",
     "storage",
     "tabs",

@@ -7,7 +7,7 @@
 | 任务 | 状态 | 提交 | 测试与证据 | 限制/未运行 |
 |---|---|---|---|---|
 | T00 | PASS | 本任务提交 | `npm ci`; `npm run build`; `node scripts/probe-ankiconnect.mjs`; 入口/AI/TTS/浏览器审计见 BASELINE.md、CAPABILITIES.md | AnkiConnect不可达；Firefox未安装；真实音频导出未运行 |
-| T01 | TODO | — | — | — |
+| T01 | PASS | 本任务提交 | `npm run test:anki`（6/6）；连续构建；watch重编译；Chromium 150加载dist并核实后台listener、content facade | Firefox未安装；正式Chrome 153自动加载受发行版命令行限制，使用同机Chromium实测 |
 | T02 | TODO | — | — | — |
 | T03 | TODO | — | — | — |
 | T04 | TODO | — | — | — |
@@ -54,6 +54,18 @@
 回归检查：A00 可由 BASELINE.md 的入口图与构建命令复查；T00 未改运行时代码。
 提交：本任务提交。
 下一任务：T01，建立隔离模块、加载桥接与测试框架。
+
+### T01
+
+实际基线：T00 已通过；遗留 Webpack 使用 classic-script 多入口与 `iife:false`，Chrome/Firefox 共用同一 `background.js`。
+修改文件：`src/anki/runtime.js`、`src/anki/content-adapter.js`、`src/anki/content-entry.js`、`tests/anki/**`、`webpack.config.js`、三个 manifest、`background.js`、`package.json`、本记录。
+行为变化：新增隔离的 `LingKumaAnki` content facade 和幂等后台消息路由；仅接受 `lingkuma.anki.v1` namespace；在 a3/a4/a5 前加载；Chrome/Firefox manifest 增加 `alarms`。初始化不发网络、不写库、不修改词汇。
+测试命令：`npm run test:anki`；`npm run watch` 后触碰 content entry；使用 Chromium 150 以 unpacked extension 加载 `dist`，打开 `example.com` 并从扩展隔离世界检查 facade。
+实际结果：unit 3/3、integration 2/2、e2e 1/1；legacy 与 anki-content 连续构建成功；watch 同时重编译两个 compiler；扩展无加载错误，后台 state 为 `lingkuma.anki.v1` 且 listener 已注册，页面隔离世界得到同 namespace/version 1 facade。
+未运行的验收：Firefox 未安装；正式 Chrome 153 已确认不接受自动 `--load-extension` 路径，因此自动化使用同机 Chromium 150，正式 Chrome 人工加载留到 T20。
+回归检查：遗留 output/module 设置未全局改变；动态脚本原顺序保留；foreign message 测试证明新 listener 不抢答遗留消息；构建仍仅有原有两个体积警告。
+提交：本任务提交。
+下一任务：T02，冻结数据契约和确定性摘录身份。
 
 ## 最终真实环境验收
 

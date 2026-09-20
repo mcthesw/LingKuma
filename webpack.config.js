@@ -11,7 +11,8 @@ const chart = require('./src/options/chars/chart');
 // const serviceFiles = glob.sync('./src/service/*.js');
 // const pluginFiles = glob.sync('./src/plugin/**/*.js');
 // const utilsFiles = glob.sync('./src/utils/*.js');
-module.exports = {
+const legacyConfig = {
+  name: 'legacy',
   mode: 'production', // 或 'development'，取决于您的需求
   entry: {
     // 将content中的每个文件拆分为单独的入口点
@@ -293,3 +294,26 @@ module.exports = {
     rules: []  // 移除所有规则
   }
 };
+
+const ankiContentConfig = {
+  name: 'anki-content',
+  dependencies: ['legacy'],
+  mode: 'production',
+  entry: './src/anki/content-entry.js',
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: 'src/anki/content.js',
+    iife: true,
+    module: false,
+  },
+  optimization: {
+    minimize: true,
+    runtimeChunk: false,
+    splitChunks: false,
+  },
+  resolve: {
+    extensions: ['.js'],
+  },
+};
+
+module.exports = [legacyConfig, ankiContentConfig];
