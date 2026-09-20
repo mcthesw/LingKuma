@@ -17,7 +17,7 @@
 | T08 | PASS | 本任务提交 | `npm run test:anki`：single-flight、乱序、重启、generation、编辑、有限重试及恢复共20/20 integration通过 | 调度/alarms并发预算留T11 |
 | T09 | PASS | 本任务提交 | `npm run test:anki`：创建、读回、未知结果、重启、重复错误、租约及冲突共30/30 integration通过 | 真实Anki写入留T20 |
 | T10 | PASS | 本任务提交 | `npm run test:anki`：原地更新、三方差异、未确认恢复、并发编辑及显式重建共38/38 integration通过 | 真实Anki更新与卡片复习数据观测留T20 |
-| T11 | TODO | — | — | — |
+| T11 | PASS | 本任务提交 | `npm run test:anki`：alarm、过期lease、AI并发、百条离线队列、全局退避及配置修复共43/43 integration通过 | 浏览器真实休眠/唤醒链留T20 |
 | T12 | TODO | — | — | — |
 | T13 | TODO | — | — | — |
 | T14 | TODO | — | — | — |
@@ -174,6 +174,18 @@
 回归检查：构建成功且仅有原有体积警告；add创建恢复、repository租约和原有53项unit均通过；无删除重建更新、无review接口、无标签清空、无远端默认覆盖。
 提交：本任务提交。
 下一任务：T11，实现持久后台调度、全局退避、alarm和worker恢复。
+
+### T11
+
+实际基线：enrich/push均已有持久job、有限lease和协调器，但没有统一批处理预算、alarm唤醒或跨job的Anki连接退避。
+修改文件：`src/anki/scheduler.js`、`src/anki/queue-store.js`、`src/anki/repository.js`、`tests/anki/integration/scheduler.test.js`、本记录。
+行为变化：新增单实例批处理执行器，AI并发硬限制为2、Anki写严格串行，并同时限制每批job数和执行时间；worker启动、alarm、查询回调、设置修复和管理页入口均有显式drain钩子。队列最早执行时间与lease到期从IndexedDB计算，缺失alarm在启动时重建。Anki连接失败使用持久化1/2/5/15分钟全局退避，一条失败即停止本批，避免逐词连接风暴；共享配置错误全局暂停，修复后重排blocked记录。AI仍沿用T08有界重试，不增加永久定时器或keepalive。
+测试命令：`npm run test:anki`。
+实际结果：unit 53/53、integration 43/43、e2e 1/1通过；alarm callback适配、丢失alarm重建、worker重启后过期lease回收、AI最大并发2、Anki最大并发1、100条离线队列仅一次连接、退避跨执行器持久、恢复后20条分批自动排空、鉴权阻断及设置修复恢复均通过。
+未运行的验收：浏览器真实休眠/系统睡眠后的alarm触发与真实Anki恢复链留T20；调度器与设置/管理消息的生产装配按依赖在T12完成。
+回归检查：构建成功且仅有原有体积警告；scheduler未进入content bundle，仍为3.2 KiB；已有创建、更新、enrichment和租约测试全部通过。
+提交：本任务提交。
+下一任务：T12，实现一次性设置、就绪检查、可信设置消息及调度器生产装配。
 
 ## 最终真实环境验收
 

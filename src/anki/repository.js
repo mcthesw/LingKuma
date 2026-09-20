@@ -12,6 +12,11 @@ const {
   requestRecreate: requestRecreateTransaction,
   resolveRemoteDifference: resolveRemoteDifferenceTransaction,
 } = require('./reconciliation-store');
+const {
+  deferJob: deferJobTransaction,
+  getJobSchedule: getJobScheduleTransaction,
+  requeueBlockedPushes: requeueBlockedPushesTransaction,
+} = require('./queue-store');
 
 const DATABASE_NAME = 'lingkuma-anki-v1';
 const DATABASE_VERSION = 1;
@@ -620,6 +625,18 @@ class AnkiRepository {
     } catch (error) {
       throw storageError(error);
     }
+  }
+
+  getJobSchedule() {
+    return getJobScheduleTransaction(this);
+  }
+
+  requeueBlockedPushes() {
+    return requeueBlockedPushesTransaction(this, createJob);
+  }
+
+  deferJob(jobId, nextAttemptAt) {
+    return deferJobTransaction(this, jobId, nextAttemptAt);
   }
 
   async getMeta(key) {
