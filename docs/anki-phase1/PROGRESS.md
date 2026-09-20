@@ -15,7 +15,7 @@
 | T06 | PASS | 本任务提交 | `npm run test:anki:integration`：立即持久化、重复/新语境、异常状态、编辑/再生成/排除/恢复13/13通过 | 暂未接网页UI，按任务留T13/T14 |
 | T07 | PASS | 本任务提交 | `npm run test:anki`：结构化释义、注入边界、错误分类和Abort共53/53 unit通过 | 未调用真实AI，留T20 |
 | T08 | PASS | 本任务提交 | `npm run test:anki`：single-flight、乱序、重启、generation、编辑、有限重试及恢复共20/20 integration通过 | 调度/alarms并发预算留T11 |
-| T09 | TODO | — | — | — |
+| T09 | PASS | 本任务提交 | `npm run test:anki`：创建、读回、未知结果、重启、重复错误、租约及冲突共30/30 integration通过 | 真实Anki写入留T20 |
 | T10 | TODO | — | — | — |
 | T11 | TODO | — | — | — |
 | T12 | TODO | — | — | — |
@@ -150,6 +150,18 @@
 回归检查：构建成功且仅有原有体积警告；原始context不被provider结果替换；无有效meaning时没有push任务；optional字段为空不阻断有效meaning。
 提交：本任务提交。
 下一任务：T09，实现幂等创建和未知结果恢复。
+
+### T09
+
+实际基线：有效释义已原子投递push，AnkiConnect客户端、固定模型和pendingWrite仓储接口已存在；尚无创建协调器。
+修改文件：`src/anki/sync-service.js`、`src/anki/repository.js`、`tests/anki/support/fake-anki.js`、`tests/anki/integration/sync-create.test.js`、本记录。
+行为变化：push创建分支写前核对profile/deck/model并按CaptureId查询、notesInfo精确复核；先持久化带当前lease的pendingWrite，再以CaptureId首字段和allowDuplicate=false调用addNote；成功后再次查询核实才确认关联。超时、重复错误、worker中断及本地确认失败均先协调远端结果，不盲目再次创建；曾关联缺失、多匹配、身份错配分别进入remote_missing/conflict。
+测试命令：`npm run test:anki`。
+实际结果：unit 53/53、integration 30/30、e2e 1/1通过；正常创建/读回、add成功丢响应、pendingWrite后重启、确认落盘失败恢复、查找与duplicate竞态、过期lease、同词异句、多匹配、远端删除、身份/profile错误均通过；所有场景无guiAddCards。
+未运行的验收：本机AnkiConnect仍不可达，真实add/readback留T20；已关联内容更新及三方差异按依赖留T10。
+回归检查：构建成功且仅有原有体积警告；无meaning没有push；不同语境只按CaptureId区分；addNote每次协调尝试最多一次且读取可自动重试、写入不自动重试。
+提交：本任务提交。
+下一任务：T10，实现原地更新、三方差异和待确认写恢复。
 
 ## 最终真实环境验收
 

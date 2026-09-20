@@ -385,13 +385,25 @@ class AnkiRepository {
     }
   }
 
-  async prepareWrite(captureId, sentRevision, intendedFields, previousBase, { opId, kind = 'update' } = {}) {
+  async prepareWrite(captureId, sentRevision, intendedFields, previousBase, {
+    opId,
+    kind = 'update',
+    jobToken = null,
+  } = {}) {
     if (!opId || !['create', 'update'].includes(kind)) {
       throw new ContractError('INPUT_INVALID', 'Invalid pending write.');
     }
     try {
-      const transaction = this.database.transaction('captures', 'readwrite');
+      const storeNames = jobToken ? ['captures', 'jobs'] : ['captures'];
+      const transaction = this.database.transaction(storeNames, 'readwrite');
       const store = transaction.objectStore('captures');
+      if (jobToken) {
+        const job = await requestResult(transaction.objectStore('jobs').get(jobToken.jobId));
+        if (!job || job.leaseOwner !== jobToken.ownerToken || job.requestedRevision !== sentRevision) {
+          await transactionDone(transaction);
+          return null;
+        }
+      }
       const capture = await requestResult(store.get(captureId));
       if (!capture) {
         throw new ContractError('INPUT_INVALID', 'Capture does not exist.');
