@@ -459,7 +459,11 @@ class AnkiRepository {
     }
   }
 
-  async setActive(captureId, active) {
+  async setDeliveryState(captureId, deliveryState, lastError = null) {
+    const allowedStates = ['pending', 'synced', 'conflict', 'remote_missing', 'blocked'];
+    if (!allowedStates.includes(deliveryState)) {
+      throw new ContractError('INPUT_INVALID', 'Invalid delivery state.');
+    }
     try {
       const transaction = this.database.transaction('captures', 'readwrite');
       const store = transaction.objectStore('captures');
@@ -467,7 +471,8 @@ class AnkiRepository {
       if (!capture) {
         throw new ContractError('INPUT_INVALID', 'Capture does not exist.');
       }
-      capture.active = active === true;
+      capture.link.deliveryState = deliveryState;
+      capture.link.lastError = lastError ? clone(lastError) : null;
       capture.updatedAt = this.now();
       store.put(capture);
       await transactionDone(transaction);
@@ -477,12 +482,92 @@ class AnkiRepository {
     }
   }
 
-  excludeCapture(captureId) {
-    return this.setActive(captureId, false);
+  async excludeCapture(captureId) {
+    try {
+      const transaction = this.database.transaction(['captures', 'jobs'], 'readwrite');
+      const captures = transaction.objectStore('captures');
+      const jobs = transaction.objectStore('jobs');
+      const capture = await requestResult(captures.get(captureId));
+      if (!capture) {
+        throw new ContractError('INPUT_INVALID', 'Capture does not exist.');
+      }
+      capture.active = false;
+      capture.updatedAt = this.now();
+      captures.put(capture);
+      const allJobs = await requestResult(jobs.getAll());
+      for (const job of allJobs) {
+        if (job.captureId === captureId) {
+          jobs.delete(job.jobId);
+        }
+      }
+      await transactionDone(transaction);
+      return clone(capture);
+    } catch (error) {
+      throw storageError(error);
+    }
   }
 
-  resumeCapture(captureId) {
-    return this.setActive(captureId, true);
+  async resumeCapture(captureId) {
+    try {
+      const transaction = this.database.transaction(['captures', 'jobs'], 'readwrite');
+      const captures = transaction.objectStore('captures');
+      const jobs = transaction.objectStore('jobs');
+      const capture = await requestResult(captures.get(captureId));
+      if (!capture) {
+        throw new ContractError('INPUT_INVALID', 'Capture does not exist.');
+      }
+      capture.active = true;
+      capture.updatedAt = this.now();
+      captures.put(capture);
+      if (!['conflict', 'remote_missing', 'blocked'].includes(capture.link.deliveryState)) {
+        if (capture.contentState !== 'ready') {
+          jobs.put(createJob(captureId, 'enrich', capture.updatedAt, {
+            revision: capture.contentRevision,
+            generation: capture.enrichmentGeneration,
+          }));
+        } else if ((capture.dirtyFields || []).length > 0 || !capture.link.wasLinked) {
+          jobs.put(createJob(captureId, 'push', capture.updatedAt, {
+            revision: capture.contentRevision,
+          }));
+        }
+      }
+      await transactionDone(transaction);
+      return clone(capture);
+    } catch (error) {
+      throw storageError(error);
+    }
+  }
+
+  async requestRegeneration(captureId, expectedRevision) {
+    try {
+      const transaction = this.database.transaction(['captures', 'jobs'], 'readwrite');
+      const captures = transaction.objectStore('captures');
+      const jobs = transaction.objectStore('jobs');
+      const capture = await requestResult(captures.get(captureId));
+      if (!capture) {
+        throw new ContractError('INPUT_INVALID', 'Capture does not exist.');
+      }
+      if (!capture.active) {
+        throw new ContractError('INPUT_INVALID', 'Excluded captures must be resumed before regeneration.');
+      }
+      if (capture.contentRevision !== expectedRevision) {
+        throw new ContractError('STALE_REVISION', 'Capture was edited by another operation.', {
+          details: { current: clone(capture) },
+        });
+      }
+      capture.enrichmentGeneration += 1;
+      capture.contentState = 'pending';
+      capture.updatedAt = this.now();
+      captures.put(capture);
+      jobs.put(createJob(captureId, 'enrich', capture.updatedAt, {
+        revision: capture.contentRevision,
+        generation: capture.enrichmentGeneration,
+      }));
+      await transactionDone(transaction);
+      return clone(capture);
+    } catch (error) {
+      throw storageError(error);
+    }
   }
 
   async listCaptures({ state, active, termKey, cursor, limit = 50 } = {}) {

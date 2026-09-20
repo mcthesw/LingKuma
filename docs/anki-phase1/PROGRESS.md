@@ -12,7 +12,7 @@
 | T03 | PASS | 本任务提交 | `npm run test:anki:integration`：并发、原子回滚、重启、租约、revision、pendingWrite、迁移8/8通过 | 无 |
 | T04 | PASS | 本任务提交 | `npm run test:anki`：协议/错误/timeout/loopback/redirect/profile及写请求单次尝试全部通过 | 本机AnkiConnect仍不可达，真实返回形状留T20 |
 | T05 | PASS | 本任务提交 | `npm run test:anki`：模板、兼容性、正确目标强调及恶意HTML/media/source输入全部通过 | 真实Anki卡片外观留T20 |
-| T06 | TODO | — | — | — |
+| T06 | PASS | 本任务提交 | `npm run test:anki:integration`：立即持久化、重复/新语境、异常状态、编辑/再生成/排除/恢复13/13通过 | 暂未接网页UI，按任务留T13/T14 |
 | T07 | TODO | — | — | — |
 | T08 | TODO | — | — | — |
 | T09 | TODO | — | — | — |
@@ -114,6 +114,18 @@
 回归检查：已有兼容model只读字段并复用，不调用createModel；不兼容字段/顺序和牌组缺失明确阻断；无远程CSS/JS/资源。
 提交：本任务提交。
 下一任务：T06，实现主动查词的立即保存服务。
+
+### T06
+
+实际基线：G0全部通过；repository具备原子capture/job，renderer和字段契约已冻结。
+修改文件：`src/anki/capture-service.js`、`src/anki/repository.js`、`tests/anki/integration/capture-service.test.js`、本记录。
+行为变化：新增lookup应用服务，先完成事务再返回安全DTO；重复身份复用原记录/任务，新语境直接新建；支持显式编辑、再生成、停止管理和恢复；未配置destination仍正常落盘。
+测试命令：`npm run test:anki:integration`。
+实际结果：integration 13/13通过；首次响应可从数据库读回；重复查询保留captureId/CapturedAt且不增job；新句子自动生成新记录；conflict、remote_missing、excluded均重开原记录；旧revision拒绝；DTO不泄露noteId、pendingWrite或远端字段正文。
+未运行的验收：本任务按范围未修改网页UI，真实主动查词留T13/T14。
+回归检查：构建成功且仅有原有体积警告；exclude原子取消本地任务但不删除capture/Anki，resume按当前状态恢复单一任务；服务不读取DOM或修改Known。
+提交：本任务提交。
+下一任务：T07，提取无DOM依赖的语境解释适配器。
 
 ## 最终真实环境验收
 
