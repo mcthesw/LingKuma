@@ -2269,6 +2269,8 @@
       <button id="tab-backup" class="submenu-item" data-i18n="backup">备份/还原</button>
     </div>
 
+    <button id="tab-anki">Anki 摘录</button>
+
 
    <!-- API设置菜单项及子菜单 -->
     <button class="menu-item" id="menu-api">
@@ -2358,6 +2360,50 @@
   <div class="main-content">
 
 
+
+    <div id="panel-anki" class="hidden">
+      <h2>Anki 摘录</h2>
+      <div class="settings-section" style="padding: 20px; max-width: 720px;">
+        <div class="setting-item" style="margin-bottom: 16px;">
+          <label for="ankiEndpoint" style="display: block; margin-bottom: 6px;">AnkiConnect 地址</label>
+          <input id="ankiEndpoint" type="url" value="http://127.0.0.1:8765/" style="width: 100%; box-sizing: border-box; padding: 8px;">
+        </div>
+        <div class="setting-item" style="margin-bottom: 16px;">
+          <label for="ankiApiKey" style="display: block; margin-bottom: 6px;">API Key</label>
+          <input id="ankiApiKey" type="password" autocomplete="new-password" style="width: 100%; box-sizing: border-box; padding: 8px;">
+        </div>
+        <button id="ankiTestConnection" type="button">测试连接</button>
+        <div class="setting-item" style="margin: 18px 0 16px;">
+          <label for="ankiDeck" style="display: block; margin-bottom: 6px;">目标牌组</label>
+          <select id="ankiDeck" style="width: 100%; box-sizing: border-box; padding: 8px;"></select>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 16px;">
+          <div class="setting-item">
+            <label for="ankiLearningLanguage" style="display: block; margin-bottom: 6px;">学习语言</label>
+            <input id="ankiLearningLanguage" value="en" style="width: 100%; box-sizing: border-box; padding: 8px;">
+          </div>
+          <div class="setting-item">
+            <label for="ankiMeaningLanguage" style="display: block; margin-bottom: 6px;">释义语言</label>
+            <input id="ankiMeaningLanguage" value="zh" style="width: 100%; box-sizing: border-box; padding: 8px;">
+          </div>
+        </div>
+        <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <input id="ankiAttachAudio" type="checkbox" checked>
+          自动附加可用的发音音频
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+          <input id="ankiAutoCapture" type="checkbox" disabled>
+          自动摘录主动查词
+        </label>
+        <label id="ankiSingleProfileRow" style="display: none; align-items: flex-start; gap: 8px; margin-bottom: 12px;">
+          <input id="ankiSingleProfileConfirmation" type="checkbox">
+          <span>此版本无法检测 Anki Profile 切换；我确认只在当前 Profile 使用自动摘录。</span>
+        </label>
+        <div id="ankiProfileStatus" style="margin-bottom: 12px; color: var(--text-secondary);"></div>
+        <button id="ankiSaveSettings" type="button">保存并启用</button>
+        <div id="ankiSetupStatus" role="status" aria-live="polite" style="margin-top: 14px;"></div>
+      </div>
+    </div>
 
  <!-- 新增 Panel：云端数据库设置 -->
  <div id="panel-cloud-db" class="hidden">

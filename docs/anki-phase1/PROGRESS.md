@@ -18,7 +18,7 @@
 | T09 | PASS | 本任务提交 | `npm run test:anki`：创建、读回、未知结果、重启、重复错误、租约及冲突共30/30 integration通过 | 真实Anki写入留T20 |
 | T10 | PASS | 本任务提交 | `npm run test:anki`：原地更新、三方差异、未确认恢复、并发编辑及显式重建共38/38 integration通过 | 真实Anki更新与卡片复习数据观测留T20 |
 | T11 | PASS | 本任务提交 | `npm run test:anki`：alarm、过期lease、AI并发、百条离线队列、全局退避及配置修复共43/43 integration通过 | 浏览器真实休眠/唤醒链留T20 |
-| T12 | TODO | — | — | — |
+| T12 | PASS | 本任务提交 | `npm run test:anki`：设置/凭证/绑定/profile/model/deck/可信路由共46/46 integration通过；Chromium真实连接AnkiConnect 6 | 未创建真实模型，写入验收留T20 |
 | T13 | TODO | — | — | — |
 | T14 | TODO | — | — | — |
 | T15 | TODO | — | — | — |
@@ -186,6 +186,18 @@
 回归检查：构建成功且仅有原有体积警告；scheduler未进入content bundle，仍为3.2 KiB；已有创建、更新、enrichment和租约测试全部通过。
 提交：本任务提交。
 下一任务：T12，实现一次性设置、就绪检查、可信设置消息及调度器生产装配。
+
+### T12
+
+实际基线：T11仅提供可装配调度器；生产后台尚未创建repository/coordinator/client，设置页也没有Anki入口、就绪检查或可信管理消息。
+修改文件：`src/anki/setup-service.js`、`src/anki/background-runtime.js`、`src/anki/settings-ui.js`、`src/anki/queue-store.js`、`src/anki/repository.js`、`src/anki/anki-client.js`、`src/options/options.html`、`src/options/options.js`、`background.js`、`tests/anki/unit/setup-service.test.js`、`tests/anki/unit/anki-client.test.js`、`tests/anki/integration/setup-service.test.js`、本记录。
+行为变化：设置页新增一次性Anki设置、只读连接测试、牌组选择、固定模型创建/核验、学习/释义语言、音频偏好和全局自动摘录开关。key只保存在新IndexedDB meta，public DTO仅返回hasApiKey；既不进入content DTO，也不进入遗留storage/WebDAV。首次设置仅给尚无destination的记录绑定当前profile/deck/model并恢复队列，后续目标变化只影响新记录。Profile可检测时固定预期值；不可检测时必须显式确认单Profile限制。生产后台同步注册受限消息和alarm监听，再异步装配repository、AI adapter、sync service和scheduler；设置/model动作同时校验sender扩展ID与允许页面路径。修复浏览器原生fetch/timer脱离原receiver时的`Illegal invocation`。
+测试命令：`node --test tests/anki/unit/anki-client.test.js tests/anki/unit/setup-service.test.js`；`node --test tests/anki/integration/setup-service.test.js`；`npm run test:anki`；Chromium 150加载最终构建并在设置页执行只读连接测试。
+实际结果：unit 56/56、integration 46/46、e2e 1/1通过；key不回传、旧未配置记录绑定、目标变更不迁移旧记录、暂停不重连、缺牌组/坏字段顺序/不支持profile确认/profile mismatch、伪造sender拒绝均通过。真实设置页显示连接AnkiConnect 6成功、27个牌组及当前profile，key输入保持空白；未保存设置、未创建模型或笔记。
+未运行的验收：为避免未经选择测试牌组就修改用户Anki，真实`createModel`和设置后自动制卡留T20专用测试数据；Firefox仍未安装。
+回归检查：构建成功且仅有原有体积警告；content bundle仍为3.2 KiB；设置页经截图确认布局与未配置/连接成功状态，旧查词、创建、更新、调度测试全通过。
+提交：本任务提交。
+下一任务：T13，将主动单词查询语义入口接到capture.lookup，并显示不阻塞阅读的持久状态。
 
 ## 最终真实环境验收
 

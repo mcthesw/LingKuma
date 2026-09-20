@@ -13,6 +13,7 @@ const {
   resolveRemoteDifference: resolveRemoteDifferenceTransaction,
 } = require('./reconciliation-store');
 const {
+  bindUnconfiguredCaptures: bindUnconfiguredCapturesTransaction,
   deferJob: deferJobTransaction,
   getJobSchedule: getJobScheduleTransaction,
   requeueBlockedPushes: requeueBlockedPushesTransaction,
@@ -625,6 +626,10 @@ class AnkiRepository {
     } catch (error) {
       throw storageError(error);
     }
+  }
+
+  bindUnconfiguredCaptures(destination) {
+    return bindUnconfiguredCapturesTransaction(this, destination);
   }
 
   getJobSchedule() {

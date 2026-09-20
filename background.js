@@ -1,6 +1,12 @@
+const { initializeAnkiBackground } = require('./src/anki/background-runtime');
 const { initializeAnkiRuntime } = require('./src/anki/runtime');
 
-initializeAnkiRuntime({ browserApi: chrome });
+const ankiRuntime = initializeAnkiRuntime({ browserApi: chrome });
+initializeAnkiBackground({
+  browserApi: chrome,
+  runtime: ankiRuntime,
+  providerRequest: request => handleAIRequest(request),
+});
 
 const dbName = 'vocabDB';
 const dbVersion = 3; // 升级版本以添加isCustom索引

@@ -51,6 +51,30 @@ test('invoke sends version 6 and optional key while accepting null and extra fie
   assert.equal(calls[0].options.redirect, 'manual');
 });
 
+test('native-style fetch transports are invoked with the global receiver', async () => {
+  const receivers = [];
+  const client = new AnkiConnectClient({
+    fetchImpl: function fetchWithRequiredReceiver() {
+      receivers.push(this);
+      if (this !== globalThis) {
+        throw new TypeError('Illegal invocation');
+      }
+      return Promise.resolve(response({ result: 6, error: null }));
+    },
+    setTimeoutImpl: function setTimeoutWithRequiredReceiver() {
+      receivers.push(this);
+      return 1;
+    },
+    clearTimeoutImpl: function clearTimeoutWithRequiredReceiver() {
+      receivers.push(this);
+    },
+    readRetries: 0,
+  });
+
+  assert.equal(await client.version(), 6);
+  assert.deepEqual(receivers, [globalThis, globalThis, globalThis]);
+});
+
 test('protocol and transport failures receive stable classifications', async t => {
   await t.test('remote error', async () => {
     const client = new AnkiConnectClient({

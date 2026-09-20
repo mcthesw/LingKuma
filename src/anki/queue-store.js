@@ -58,6 +58,28 @@ async function requeueBlockedPushes(repository, createJob) {
   }
 }
 
+async function bindUnconfiguredCaptures(repository, destination) {
+  try {
+    const transaction = repository.database.transaction('captures', 'readwrite');
+    const captures = transaction.objectStore('captures');
+    const allCaptures = await requestResult(captures.getAll());
+    let count = 0;
+    for (const capture of allCaptures) {
+      if (capture.destination) {
+        continue;
+      }
+      capture.destination = clone(destination);
+      capture.updatedAt = repository.now();
+      captures.put(capture);
+      count += 1;
+    }
+    await transactionDone(transaction);
+    return count;
+  } catch (error) {
+    throw storageError(error);
+  }
+}
+
 async function deferJob(repository, jobId, nextAttemptAt) {
   if (typeof jobId !== 'string' || !Number.isFinite(nextAttemptAt)) {
     throw new ContractError('INPUT_INVALID', 'The deferred job is invalid.');
@@ -78,6 +100,7 @@ async function deferJob(repository, jobId, nextAttemptAt) {
 }
 
 module.exports = {
+  bindUnconfiguredCaptures,
   deferJob,
   getJobSchedule,
   requeueBlockedPushes,

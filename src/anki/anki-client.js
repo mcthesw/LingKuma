@@ -95,11 +95,11 @@ class AnkiConnectClient {
     }
     this.endpoint = validateEndpoint(endpoint);
     this.key = typeof key === 'string' ? key : '';
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = fetchImpl.bind(globalThis);
     this.timeoutMs = timeoutMs;
     this.readRetries = Math.max(0, Math.min(2, readRetries));
-    this.setTimeoutImpl = setTimeoutImpl;
-    this.clearTimeoutImpl = clearTimeoutImpl;
+    this.setTimeoutImpl = setTimeoutImpl.bind(globalThis);
+    this.clearTimeoutImpl = clearTimeoutImpl.bind(globalThis);
   }
 
   async invoke(action, params = {}, options = {}) {

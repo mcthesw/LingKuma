@@ -1,3 +1,5 @@
+require('../anki/settings-ui');
+
 // 背景设置相关变量
 let backgroundImageUrl = chrome.runtime.getURL("src/service/image/pattern.png"); // 默认背景图片
 let isBackgroundVideo = false; // 是否使用视频背景
