@@ -7,6 +7,8 @@ const glob = require('glob');
 const TerserPlugin = require('terser-webpack-plugin');
 const chart = require('./src/options/chars/chart');
 
+const outputDirectory = process.env.LINGKUMA_BROWSER_TARGET === 'firefox' ? 'dist-firefox' : 'dist';
+const manifestSource = process.env.LINGKUMA_BROWSER_TARGET === 'firefox' ? 'manifest-firefox.json' : 'manifest.json';
 // 获取service目录下的所有js文件
 // const serviceFiles = glob.sync('./src/service/*.js');
 // const pluginFiles = glob.sync('./src/plugin/**/*.js');
@@ -59,7 +61,7 @@ const legacyConfig = {
     sidebar: './src/sidebar/sidebar.js'
   },
   output: {
-    path: path.resolve(__dirname, 'dist'),
+    path: path.resolve(__dirname, outputDirectory),
     filename: (pathData) => {
       // 为原始content入口中的文件保持原始目录结构
       // if(pathData.chunk.name === 'webdav'){
@@ -217,9 +219,7 @@ const legacyConfig = {
     new CopyPlugin({
       patterns: [
 
-        //{ from: 'manifest-firefox.json', to: 'manifest.json' },
-        //{ from: 'manifest-firefox-local.json', to: 'manifest.json' },
-        { from: 'manifest.json', to: 'manifest.json' },
+        { from: manifestSource, to: 'manifest.json' },
         { from: 'content.css', to: '' },
         { from: 'src/anki/manager.css', to: 'src/anki/manager.css' },
         { from: 'src/options/epubSplitter/jszip.min.js', to: 'src/options/epubSplitter/jszip.min.js',info: { minimized: true }}, // 告诉webpack这已经是压缩文件，不要处理
@@ -259,12 +259,14 @@ const legacyConfig = {
     new HtmlWebpackPlugin({
       template: './src/popup/popup.html',
       filename: 'src/popup/popup.html',
+      inject: false,
       chunks: ['popup'],
     }),
     new HtmlWebpackPlugin({
       template: './src/options/options.html',
       filename: 'src/options/options.html',
       chunks: ['options'],
+      inject: false,
     }),
     new HtmlWebpackPlugin({
       template: './src/anki/manager.html',
@@ -311,7 +313,7 @@ const ankiContentConfig = {
   mode: 'production',
   entry: './src/anki/content-entry.js',
   output: {
-    path: path.resolve(__dirname, 'dist'),
+    path: path.resolve(__dirname, outputDirectory),
     filename: 'src/anki/content.js',
     iife: true,
     module: false,

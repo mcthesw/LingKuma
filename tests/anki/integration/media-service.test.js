@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { indexedDB } = require('fake-indexeddb');
+const { ContractError } = require('../../../src/anki/contracts');
 const { MediaService, MAX_MEDIA_BYTES, validateAudio } = require('../../../src/anki/media-service');
 const { MediaStore } = require('../../../src/anki/media-store');
 const { openAnkiRepository } = require('../../../src/anki/repository');
@@ -90,6 +91,39 @@ test('unsupported playback-only provider leaves the already-synced text note int
   assert.equal(capture.link.deliveryState, 'synced');
   assert.equal(f.anki.countCalls('addNote'), 1);
   assert.equal(f.anki.countCalls('storeMediaFile'), 0);
+  f.repository.close();
+});
+
+test('an expired media lease cannot fetch or upload before the current worker owns it', async () => {
+  let fetches = 0;
+  const audioProvider = provider({ afterFetch: async () => { fetches += 1; } });
+  const f = await fixture(audioProvider);
+  const expired = await f.repository.claimDueJob('media', 1_000, 'expired-media', 5);
+  f.advance(6);
+  const current = await f.repository.claimDueJob('media', 1_006, 'current-media', 30_000);
+  assert.equal((await f.media.processClaimedJob(expired)).status, 'stale');
+  assert.equal(fetches, 0);
+  assert.equal(f.anki.countCalls('storeMediaFile'), 0);
+  assert.equal((await f.media.processClaimedJob(current)).status, 'committed');
+  assert.equal(fetches, 1);
+  assert.equal(f.anki.countCalls('storeMediaFile'), 1);
+  f.repository.close();
+});
+
+test('a lost media response retries the same content-addressed filename without another note', async () => {
+  const f = await fixture(provider());
+  f.anki.afterStoreMedia = async () => {
+    f.anki.afterStoreMedia = null;
+    throw new ContractError('TIMEOUT', 'media response lost', { retryable: true });
+  };
+  assert.equal((await f.runMedia('lost-media-response')).status, 'rescheduled');
+  assert.equal(f.anki.countCalls('storeMediaFile'), 1);
+  f.advance(5_000);
+  assert.equal((await f.runMedia('media-recovery')).status, 'committed');
+  assert.equal(f.anki.countCalls('storeMediaFile'), 2);
+  assert.equal(f.anki.media.size, 1);
+  await f.pushAudio();
+  assert.equal(f.anki.countCalls('addNote'), 1);
   f.repository.close();
 });
 

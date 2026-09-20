@@ -218,6 +218,33 @@ test('a lost update response is recognized as the pending write and is not repla
   repository.close();
 });
 
+test('a local confirmation failure after update is reconciled without a second write', async () => {
+  let clock = 4_250;
+  const repository = await openAnkiRepository({ indexedDB, name: databaseName('confirm-failure'), now: () => clock });
+  const fake = new FakeAnki();
+  const coordinator = service(repository, fake, () => clock);
+  let capture = await createSynced(repository, fake, coordinator, clock);
+  capture = await repository.patchContent(capture.captureId, capture.contentRevision, { meaning: 'confirmed after restart' });
+  const originalConfirm = repository.confirmWrite.bind(repository);
+  let failConfirmation = true;
+  repository.confirmWrite = async (...args) => {
+    if (failConfirmation) {
+      failConfirmation = false;
+      throw new ContractError('STORAGE_FAILED', 'confirmation interrupted', { retryable: true });
+    }
+    return originalConfirm(...args);
+  };
+
+  assert.equal((await runDue(repository, coordinator, clock, 'interrupted-confirm')).status, 'retry_scheduled');
+  assert.equal(fake.countCalls('updateNoteFields'), 1);
+  assert.ok((await repository.getCapture(capture.captureId)).link.pendingWrite);
+  clock += 5_000;
+  assert.equal((await runDue(repository, coordinator, clock, 'recovered-confirm')).status, 'committed');
+  assert.equal(fake.countCalls('updateNoteFields'), 1);
+  assert.equal((await repository.getCapture(capture.captureId)).link.pendingWrite, null);
+  repository.close();
+});
+
 test('an update not observed remotely remains pending and is retried only after reconciliation', async () => {
   let clock = 4_500;
   const repository = await openAnkiRepository({ indexedDB, name: databaseName('not-applied'), now: () => clock });

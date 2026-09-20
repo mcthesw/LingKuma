@@ -16,9 +16,7 @@
     "tts",
     "storage",
     "tabs",
-    "offscreen",
     "downloads",
-    "sidePanel",
     "clipboardRead",
     "contextMenus",
     "scripting",
@@ -28,7 +26,6 @@
     "<all_urls>"
   ],
   "background": {
-    "service_worker": "background.js",
     "scripts": [
       "background.js"
     ],
@@ -52,9 +49,6 @@
   ],
   "action": {
     "default_popup": "./src/popup/popup.html"
-  },
-  "side_panel": {
-    "default_path": "src/sidebar/sidebar.html"
   },
   "web_accessible_resources": [
     {

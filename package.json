@@ -1,6 +1,7 @@
 {
   "scripts": {
     "build": "webpack --config webpack.config.js",
+    "build:firefox": "webpack --config webpack.firefox.config.js",
     "watch": "webpack --watch --config webpack.config.js",
     "pack": "npm run build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/pack-crx.ps1",
     "test:anki": "npm run test:anki:unit && npm run test:anki:integration && npm run test:anki:e2e",

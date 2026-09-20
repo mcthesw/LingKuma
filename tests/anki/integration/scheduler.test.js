@@ -156,7 +156,7 @@ test('enrichment runs at two-wide concurrency and reclaims an expired lease afte
 test('one offline failure applies durable global backoff to a large queue and recovery drains in batches', async () => {
   let clock = 10_000;
   const repository = await openAnkiRepository({ indexedDB, name: databaseName('offline'), now: () => clock });
-  await enqueueReady(repository, 100);
+  await enqueueReady(repository, 500);
   const alarms = new FakeAlarmClock();
   let online = false;
   let calls = 0;
@@ -214,10 +214,10 @@ test('one offline failure applies durable global backoff to a large queue and re
 
   online = true;
   clock += 60_000;
-  for (let batch = 0; batch < 5; batch += 1) {
+  for (let batch = 0; batch < 25; batch += 1) {
     await scheduler.scheduleDrain('alarm');
   }
-  assert.equal(calls, 101);
+  assert.equal(calls, 501);
   assert.equal(maximumWrites, 1);
   assert.equal((await repository.getJobSchedule()).count, 0);
   assert.equal(await repository.getMeta(ANKI_BACKOFF_KEY), null);

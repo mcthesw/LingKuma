@@ -26,7 +26,7 @@
 | T17 | PASS | `6845a3e` | `npm run test:anki`：unit 67/67、integration 60/60、e2e 1/1；接管、巡检、重绑定及管理核对通过；Chromium验证最终核对入口 | 六小时间隔以受控时钟推进；真实Anki外部编辑/删除留T20 |
 | T18 | PASS | `2b08002` | `npm run test:anki`：unit 67/67、integration 64/64、e2e 1/1；版本化备份、严格校验、安全合并及媒体恢复通过；Chromium验证最终导入导出入口 | 未写用户下载目录或真实Anki媒体；Firefox未安装 |
 | T19 | PASS | 本任务提交 | `npm run test:anki`：unit 74/74、integration 64/64、e2e 1/1；安全targeted 42/42；Chromium验证最终敏感选择守卫和单监听 | 未在真实密码管理器输入凭证；Firefox未安装 |
-| T20 | TODO | — | — | — |
+| T20 | PASS | 本任务提交 | 全套unit 74/74、integration 67/67、e2e 1/1+真实A49 1/1；真实AnkiConnect 6专用牌组链路、500条离线队列、三类写入三断点、Firefox 156实际加载 | 未调用真实AI/发音付费渠道，未做真实Reviewer播放、人工复习后更新或系统睡眠 |
 | T21 | TODO | — | — | — |
 
 ## 单任务交付模板
@@ -283,14 +283,27 @@
 提交：本任务提交。
 下一任务：T20，完成故障注入与真实链路验收。
 
+### T20
+
+实际基线：A00～A48已有按任务分布的自动化、Chromium页面和少量只读Anki证据，但缺少可重复执行的真实Anki写入链；媒体更新缺失请求前与丢响应断点，update缺失远端成功后本地确认失败断点，离线队列仅100条。通用构建产物实际不能被Firefox 156安装：Firefox拒绝`background.service_worker`，且popup/options被Webpack重复注入脚本后出现顶层变量重声明。
+修改文件：`tests/anki/e2e/real-ankiconnect.test.js`、`tests/anki/integration/sync-update.test.js`、`tests/anki/integration/media-service.test.js`、`tests/anki/integration/scheduler.test.js`、`manifest-firefox.json`、`manifest-firefox-local.json`、`webpack.config.js`、`webpack.firefox.config.js`、`package.json`、本记录。
+行为变化：新增显式`npm run build:firefox`，输出独立`dist-firefox`，使用Firefox后台scripts清单且不声明Firefox不支持的offscreen/sidePanel；Chromium仍输出`dist`及service worker。popup/options不再被构建器重复注入自身bundle。新增默认跳过、仅在`ANKI_REAL_E2E=1`运行的破坏面受限真实验收：创建/复用专用牌组和生产笔记类型，仅删除本轮CaptureId对应笔记，不清空牌组/model/collection。故障矩阵补齐update确认失败、媒体过期lease、媒体响应丢失；离线队列提高到500条。
+测试命令：`node --test tests/anki/integration/sync-create.test.js tests/anki/integration/sync-update.test.js tests/anki/integration/media-service.test.js`；`node --test tests/anki/integration/scheduler.test.js`；`ANKI_REAL_E2E=1 ANKI_TEST_DECK=\"LingKuma Phase1 Acceptance\" node --test tests/anki/e2e/real-ankiconnect.test.js`；`npm run test:anki`；`npm run build:firefox`；`npx web-ext lint --source-dir dist-firefox --self-hosted`；`web-ext run`在Firefox 156加载`dist-firefox`。
+实际结果：写入故障targeted 26/26、调度5/5、全套unit 74/74、integration 67/67、常规e2e 1/1通过；真实A49 1/1通过。AnkiConnect协议6、profile“账户1”上创建专用`LingKuma Phase1 Acceptance`牌组和`LingKuma Lookup v1`类型；一次lookup只调用受控provider一次、addNote一次，自动读回CaptureId。网络断开时任务保留dirty且不假称新内容已确认，恢复后原noteId更新；外部Meaning与本地UserNote并发差异进入冲突，逐字段选择后保留双方选择。更新前后cardId及queue/due/interval/reps/lapses/left/factor完全一致；备份含该记录且无key/pendingWrite。finally只按本轮CaptureId删除笔记，随后专用牌组findNotes为0。生产动作日志中guiAddCards/sync/loadProfile/changeDeck/setDueDate均为0，常规逐词保存/确认点击为0。500条离线任务只探测一次，恢复后25批串行排空。Firefox 156通过`web-ext`实际安装临时扩展，修复后的当前会话没有LingKuma脚本错误；lint为0 error/0 notice/99 warning，warning来自遗留动态innerHTML和Firefox不识别的tts权限等既有非Anki面。
+A00～A13证据：T00～T05的基线、固定向量、事务/API/模板自动化及T19安全回归；本次真实协议再次确认version=6、`result/error`形状、27个牌组、19个模型、active profile和所有生产所需action。A14～A20证据：T06～T08的重复语境、single-flight、乱序/关闭UI/人工编辑、有限恢复测试。A21～A30证据：T09～T12加本次add/update/storeMedia三类网络写入的请求前、远端成功/响应丢失、本地确认前中断，真实add/update读回与500条恢复。A31～A40证据：T13～T16的Chromium真实鼠标入口、短语/reader DOM、媒体故障及管理UI。A41～A48证据：T17～T19的关联、巡检、备份、安全和生命周期回归，加Firefox实际安装。A49由本次真实专用Anki链路覆盖设置→查询→本地→Anki→编辑→离线→恢复→外部差异→备份。
+未运行的验收：没有使用用户付费AI/Supertone配置，真实provider返回与真实Anki发音上传/Reviewer播放未运行；自动化使用同契约受控provider，音频边界和恢复使用FakeAnki。没有在外部EPUB应用、PDF.js和真实视频网站做联合写卡，只验证过受控等价DOM入口。没有让真实卡片完成一次人工复习后再更新，真实链只证明新卡所有可见调度字段更新前后不变。没有等待系统睡眠或真实杀浏览器worker，使用持久IndexedDB重开、过期lease和alarm丢失故障。Anki Desktop应用版本未能从Connect读取，记录的是Connect协议6；不把它写成桌面版本。Firefox lint的99项遗留非Anki warning没有在本任务做无关清理。
+回归检查：真实验收未使用用户现有牌组/类型或删除非本轮笔记；专用牌组最终为空。生产客户端仍拒绝createDeck/deleteNotes/cardsInfo等测试专用action，测试清理通过隔离harness直接调用，不扩大扩展权限。Chromium/Firefox输出目录和后台清单分离；常规build仍生成Chromium service worker。现有provider、Known、AnkiWeb同步和复习排程均未修改。
+提交：本任务提交。
+下一任务：T21，交付文档、可复验命令和最终回归门。
+
 ## 最终真实环境验收
 
-Anki版本 / Connect协议与能力：
-目标专用测试牌组/类型：
-Chrome/Edge：
-Firefox：
-音频提供方与真实播放：
-离线与worker中断恢复：
-Anki外部修改/删除：
-备份恢复：
-仍有的限制：
+Anki版本 / Connect协议与能力：Anki Desktop正在profile“账户1”运行；Connect协议6，真实返回统一`{result,error}`，生产所需version/deck/model/profile/find/notesInfo/add/update/storeMedia/guiBrowse action均由`apiReflect`确认。Connect不提供桌面应用版本，未猜测。
+目标专用测试牌组/类型：`LingKuma Phase1 Acceptance` / `LingKuma Lookup v1`；真实A49结束后牌组笔记数0，类型和空牌组保留供重复验收。
+Chrome/Edge：Chromium 150实际加载扩展/最终bundle并覆盖主动点击、短语、reader适配、管理、备份和安全页面；本机Chrome 153与Edge 154可用，但发行版Chrome拒绝自动`--load-extension`，没有把Chromium结果记成品牌Chrome人工测试。
+Firefox：官方Firefox 156.0；`npm run build:firefox`产物经`web-ext`临时安装成功，Getting Started页面渲染，修复重复bundle注入后当前会话无LingKuma脚本错误。`web-ext lint`为0 error，遗留非Anki warning 99。
+音频提供方与真实播放：未运行。没有消耗用户Supertone额度或向真实Anki上传测试音频；协议、校验、哈希上传、中断恢复和Audio字段更新由T15集成测试覆盖。
+离线与worker中断恢复：真实Anki链注入网络不可达后恢复并原noteId更新；add/update/media的请求前、远端成功丢响应和本地确认前中断全部自动化；500条队列一次探测后25批排空。真实系统睡眠/浏览器进程强杀未运行。
+Anki外部修改/删除：真实外部Meaning修改与本地UserNote差异被巡检识别为conflict并逐字段安全合并；真实清理仅删除本轮CaptureId笔记。外部删除/误指noteId使用FakeAnki覆盖，未在真实桌面执行删除异常链。
+备份恢复：真实A49导出当前记录并验证无key/pendingWrite；真实IndexedDB导入、旧备份冲突、删除不复活、媒体恢复及坏输入原子拒绝由T18覆盖。未向用户下载目录写文件。
+仍有的限制：真实付费AI、真实发音与Reviewer播放、外部EPUB/PDF/视频网站联合写卡、已人工复习卡更新、真实系统睡眠/worker强杀、品牌Chrome/Edge人工加载均明确未运行；不影响一期实现代码，但发布前人工检查表仍需在用户愿意提供相应环境/额度时执行。AnkiWeb/移动端同步不在一期职责内。
