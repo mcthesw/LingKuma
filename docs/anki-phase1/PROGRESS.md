@@ -9,7 +9,7 @@
 | T00 | PASS | 本任务提交 | `npm ci`; `npm run build`; `node scripts/probe-ankiconnect.mjs`; 入口/AI/TTS/浏览器审计见 BASELINE.md、CAPABILITIES.md | AnkiConnect不可达；Firefox未安装；真实音频导出未运行 |
 | T01 | PASS | 本任务提交 | `npm run test:anki`（6/6）；连续构建；watch重编译；Chromium 150加载dist并核实后台listener、content facade | Firefox未安装；正式Chrome 153自动加载受发行版命令行限制，使用同机Chromium实测 |
 | T02 | PASS | 本任务提交 | `npm run test:anki`：14组固定identity vectors及offset/Unicode/message边界全部通过 | 无 |
-| T03 | TODO | — | — | — |
+| T03 | PASS | 本任务提交 | `npm run test:anki:integration`：并发、原子回滚、重启、租约、revision、pendingWrite、迁移8/8通过 | 无 |
 | T04 | TODO | — | — | — |
 | T05 | TODO | — | — | — |
 | T06 | TODO | — | — | — |
@@ -78,6 +78,18 @@
 回归检查：构建成功且仍仅有原有体积警告；无DOM、网络、存储或Anki副作用。
 提交：本任务提交。
 下一任务：T03，实现事务化本地记录和工作队列。
+
+### T03
+
+实际基线：T02 已通过，captureId 和边界输入已冻结。
+修改文件：`src/anki/repository.js`、`tests/anki/integration/repository.test.js`、`package.json`、`package-lock.json`、本记录。
+行为变化：新增独立 `lingkuma-anki-v1` IndexedDB，含 captures/jobs/media/meta 和显式索引；capture+首个job原子提交；支持revision编辑、generation、去重任务、有限租约、pendingWrite、确认、远端差异和分页读取。
+测试命令：`npm run test:anki:integration`。
+实际结果：integration 8/8通过；20个并发查询仅一个created结果、一条capture和一个enrich job；模拟QuotaExceeded时capture/job全部回滚；关闭重开后数据和过期租约可恢复；旧revision及旧owner无法覆盖新状态；坏同版本schema保持原库并明确失败。
+未运行的验收：无；使用 `fake-indexeddb@6.2.4` 执行真实IndexedDB事务语义。
+回归检查：双Webpack compiler构建通过且仅有原有体积警告；repository不引用DOM、网络或遗留词汇库。
+提交：本任务提交。
+下一任务：T04，实现唯一的 AnkiConnect 客户端。
 
 ## 最终真实环境验收
 
