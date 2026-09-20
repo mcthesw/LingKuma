@@ -20,7 +20,7 @@
 | T11 | PASS | 本任务提交 | `npm run test:anki`：alarm、过期lease、AI并发、百条离线队列、全局退避及配置修复共43/43 integration通过 | 浏览器真实休眠/唤醒链留T20 |
 | T12 | PASS | 本任务提交 | `npm run test:anki`：设置/凭证/绑定/profile/model/deck/可信路由共46/46 integration通过；Chromium真实连接AnkiConnect 6 | 未创建真实模型，写入验收留T20 |
 | T13 | PASS | 本任务提交 | `npm run test:anki`：unit 60/60、integration 47/47、e2e 1/1；Chromium主动点击持久化且悬浮/发音/关闭不新增 | 隔离profile未配置Anki，真实最终写入留T20 |
-| T14 | TODO | — | — | — |
+| T14 | PASS | 本任务提交 | `npm run test:anki`：unit 64/64、integration 47/47、e2e 1/1；Chromium最终短语一次保存，网页/EPUB/PDF/字幕/iframe真实选区均持久化 | 外部阅读器与真实Anki自动写入合并验收留T20 |
 | T15 | TODO | — | — | — |
 | T16 | TODO | — | — | — |
 | T17 | TODO | — | — | — |
@@ -210,6 +210,18 @@
 回归检查：构建成功且仅有原有体积警告；content bundle由3.2 KiB增至5.96 KiB；普通字典、词汇状态、TTS和手动深度分析路径未移除，非主动tooltip仍走原行为。
 提交：本任务提交。
 下一任务：T14，冻结短语最终选区并统一网页、EPUB、PDF与字幕来源适配。
+
+### T14
+
+实际基线：短语Create入口在清除selection和弹窗状态后才读取定位，并用`indexOf`寻找文本，无法区分同句重复词或跨节点位置，也不传T13的capture intent；单词入口把所有来源硬编码为web。
+修改文件：`src/anki/reader-adapters.js`、`src/anki/content-adapter.js`、`src/service/a4_tooltip_new.js`、`src/service/a5_custom_word_selection.js`、`tests/anki/fixtures/reader-contexts.js`、`tests/anki/unit/reader-adapters.test.js`、本记录。
+行为变化：短语仅在用户点击现有Create按钮时同步克隆最终Range、矩形、语言和来源，再清除selection；`selectionchange`/拖动仅更新候选弹窗，不落盘。统一reader adapter通过Range前缀计算UTF-16精确位置，按真实句界或以目标为中心裁至8000单元，保留emoji、组合字符、重复同形词和跨节点文本；只能取得选区时保存`selection_only`并以文档与定位构造稳定fallback key，超过256码点明确不自动摘录且不截断。来源仅依据当前目标所在的现有DOM入口识别：普通网页保留完整SPA URL，EPUB保留文档ID/章节，PDF保留页码，字幕保留当前条目的时间点；blob不作为长期URL。单词入口也改走同一来源适配，iframe自然使用自身document URL。
+测试命令：`node --test tests/anki/unit/reader-adapters.test.js tests/anki/unit/content-adapter.test.js tests/anki/unit/contracts.test.js`；`npm run build`；`npm run test:anki`；Chromium 150隔离profile在真实可选DOM上执行拖动、跨标签最终选择及web/EPUB/PDF/字幕/iframe的原Create手势。
+实际结果：targeted 13/13通过；全套unit 64/64、integration 47/47、e2e 1/1通过。浏览器拖动三次后capture仍为0，最终`repeated phrase`只新增1条，冻结真实句`A second repeated phrase…café intact.`及9..24；emoji/NFD保持不变。EPUB、PDF、字幕分别持久化`Chapter 4`、`page 12`、`00:01:05.432`，web不受同页其他reader容器误分类。iframe记录保留自身`?chapter=7#line=2`与34..49。四类Create弹窗均真实出现并点击，截图确认最终选区弹窗不遮挡正文。
+未运行的验收：浏览器场景使用受控页面复现项目现有reader DOM入口，没有声称启动了外部EPUB应用、Mozilla PDF.js或真实YouTube视频；隔离profile未配置Anki，因此A35的外部入口与真实自动写卡联合验收按计划留T20专用测试数据。Firefox仍未安装。
+回归检查：最终构建成功且仅有原有体积警告；content bundle为10.7 KiB。整句分析按钮仍只走原分析功能，点击单词不会扩成短语，Create之外的选区变化不调用capture。
+提交：本任务提交。
+下一任务：T15，复用可导出发音渠道并以独立幂等任务附加Anki媒体。
 
 ## 最终真实环境验收
 

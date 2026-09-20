@@ -6,6 +6,7 @@ let customWordSelectionPopup = null;
 let isCustomWordSelectionEnabled = true;
 let lastSelectedText = '';
 let lastSelectionRect = null;
+let lastSelectionRange = null;
 let isInCustomWordBlacklist = false; // 当前网站是否在黑名单中（与高亮黑名单同步）
 let selectionChangeTimer = null; // 用于 selectionchange 事件的防抖计时器
 let isCreatingPopup = false; // 防止同时创建多个弹窗的标志
@@ -103,6 +104,7 @@ async function handleTextSelection(e) {
     try {
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
+      lastSelectionRange = range.cloneRange();
       lastSelectionRect = rect;
 
       console.log('检测到文本选择:', selectedText, '位置:', rect);
@@ -170,6 +172,7 @@ async function handleSelectionChange() {
     try {
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
+      lastSelectionRange = range.cloneRange();
       lastSelectionRect = rect;
 
       console.log('[selectionchange] 显示弹窗:', selectedText);
@@ -406,38 +409,54 @@ function hideCustomWordSelectionPopup() {
 function handleCustomWordLookup(selectedText) {
   console.log('处理自定义查词:', selectedText);
 
-  // 在清除选择之前先获取句子，确保能获取到完整的上下文
-  const sentence = getContextSentence(selectedText);
-  console.log('初始创建词组时获取的句子:', sentence);
-
-  // 隐藏弹窗
-  hideCustomWordSelectionPopup();
-
-  // 清除文本选择
-  window.getSelection().removeAllRanges();
-
-  // 创建一个模拟的 wordRect 用于显示 tooltip
-  // 优先使用 lastSelectionRect，如果没有则使用当前鼠标位置
-  let wordRect;
-  if (lastSelectionRect) {
-    wordRect = lastSelectionRect;
-  } else {
-    // 如果没有选择区域信息，尝试使用当前鼠标位置
-    // 获取当前鼠标位置（如果有的话）
-    const mouseX = window.lastMouseX || window.innerWidth / 2;
-    const mouseY = window.lastMouseY || window.innerHeight / 2;
-
-    wordRect = {
-      left: mouseX - 50,
-      right: mouseX + 50,
-      top: mouseY - 15,
-      bottom: mouseY + 15,
-      width: 100,
-      height: 30
-    };
+  let finalRange = null;
+  const selection = window.getSelection();
+  if (selection.rangeCount > 0 && selection.toString().trim() === selectedText.trim()) {
+    finalRange = selection.getRangeAt(0).cloneRange();
+  } else if (lastSelectionRange?.toString().trim() === selectedText.trim()) {
+    finalRange = lastSelectionRange.cloneRange();
   }
 
-  // 播放词组 TTS
+  let captureIntent = null;
+  const facade = globalThis.LingKumaAnki;
+  if (finalRange && facade?.freezeReaderOriginSnapshot) {
+    try {
+      captureIntent = {
+        snapshot: facade.freezeReaderOriginSnapshot({
+          targetRange: finalRange,
+          language: document.documentElement.lang || navigator.language || 'en',
+        }),
+      };
+    } catch (error) {
+      captureIntent = { error };
+    }
+  }
+
+  const sentence = captureIntent?.snapshot?.contextText || getContextSentence(selectedText);
+  const frozenRect = lastSelectionRect
+    ? {
+        left: lastSelectionRect.left,
+        right: lastSelectionRect.right,
+        top: lastSelectionRect.top,
+        bottom: lastSelectionRect.bottom,
+        width: lastSelectionRect.width,
+        height: lastSelectionRect.height,
+      }
+    : null;
+  console.log('初始创建词组时获取的句子:', sentence);
+
+  hideCustomWordSelectionPopup();
+  selection.removeAllRanges();
+
+  const wordRect = frozenRect || {
+    left: (window.lastMouseX || window.innerWidth / 2) - 50,
+    right: (window.lastMouseX || window.innerWidth / 2) + 50,
+    top: (window.lastMouseY || window.innerHeight / 2) - 15,
+    bottom: (window.lastMouseY || window.innerHeight / 2) + 15,
+    width: 100,
+    height: 30
+  };
+
   try {
     if (typeof playText === 'function') {
       playText({
@@ -450,17 +469,14 @@ function handleCustomWordLookup(selectedText) {
     console.error('播放词组 TTS 时发生错误:', error);
   }
 
-  // 调用现有的查词功能，但标记为自定义词组
-  showEnhancedTooltipForCustomWord(selectedText, sentence, wordRect);
+  showEnhancedTooltipForCustomWord(selectedText, sentence, wordRect, captureIntent);
 
-  // 通知自定义高亮系统有新词组添加（使用增量更新）
   if (typeof addSingleCustomWord === 'function') {
     setTimeout(() => {
       console.log('新自定义词组添加，使用增量更新');
       addSingleCustomWord(selectedText, '1', true);
-    }, 500); // 延迟确保数据库操作完成
+    }, 500);
   } else if (typeof loadCustomWords === 'function') {
-    // 回退方案
     setTimeout(() => {
       console.log('新自定义词组添加，回退到重新加载高亮');
       loadCustomWords();
@@ -622,16 +638,20 @@ function handleKeyDown(e) {
 }
 
 // 显示自定义词组的 tooltip
-async function showEnhancedTooltipForCustomWord(customWord, sentence, wordRect) {
+async function showEnhancedTooltipForCustomWord(customWord, sentence, wordRect, ankiCaptureIntent = null) {
   console.log('显示自定义词组 tooltip:', customWord);
-  
-  // 调用现有的 tooltip 显示函数，但传入特殊参数表示这是自定义词组
+
   if (typeof showEnhancedTooltipForWord === 'function') {
-    // 创建一个模拟的 parent 元素
     const mockParent = document.body;
-    
-    // 调用现有函数，传入 isCustom 标记
-    await showEnhancedTooltipForWord(customWord, sentence, wordRect, mockParent, customWord, true);
+    await showEnhancedTooltipForWord(
+      customWord,
+      sentence,
+      wordRect,
+      mockParent,
+      customWord,
+      true,
+      ankiCaptureIntent,
+    );
   } else {
     console.error('showEnhancedTooltipForWord 函数不存在');
   }

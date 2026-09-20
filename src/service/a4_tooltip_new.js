@@ -999,20 +999,15 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
 
 function createA4AnkiCaptureIntent(hoveredDetail, sentenceRange) {
   const facade = globalThis.LingKumaAnki;
-  if (!facade?.freezeWordOriginSnapshot || !hoveredDetail?.range || !sentenceRange) {
+  if (!facade?.freezeReaderOriginSnapshot || !hoveredDetail?.range || !sentenceRange) {
     return { error: new Error('当前语境无法保存') };
   }
   try {
     return {
-      snapshot: facade.freezeWordOriginSnapshot({
-        targetRange: hoveredDetail.range,
-        contextRange: sentenceRange,
+      snapshot: facade.freezeReaderOriginSnapshot({
+        targetRange: hoveredDetail.range.cloneRange(),
+        contextRange: sentenceRange.cloneRange(),
         language: document.documentElement.lang || navigator.language || 'en',
-        source: {
-          kind: 'web',
-          url: location.href,
-          title: document.title,
-        },
       }),
     };
   } catch (error) {
@@ -1048,7 +1043,7 @@ function attachA4AnkiLookup(targetTooltip, captureIntent) {
   if (captureIntent.error) {
     renderA4AnkiLookupUpdate(targetTooltip, {
       phase: 'error',
-      text: '当前语境无法保存',
+      text: captureIntent.error?.message || '当前语境无法保存',
       capture: null,
     });
     return;

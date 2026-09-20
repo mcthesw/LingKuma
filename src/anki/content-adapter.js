@@ -1,6 +1,7 @@
 'use strict';
 
 const { ANKI_NAMESPACE } = require('./runtime');
+const { freezeReaderOriginSnapshot } = require('./reader-adapters');
 
 const PUBLIC_FACADE_KEY = 'LingKumaAnki';
 const CAPTURE_CHANGED_TYPE = 'capture.changed';
@@ -200,6 +201,13 @@ function createContentFacade({ browserApi, scope = globalThis } = {}) {
       return () => changeListeners.delete(listener);
     },
     freezeWordOriginSnapshot,
+    freezeReaderOriginSnapshot(options) {
+      return freezeReaderOriginSnapshot({
+        document: scope.document,
+        location: scope.location,
+        ...options,
+      });
+    },
     startWordLookup(options) {
       return createWordLookupController({ facade, scope, ...options });
     },
@@ -230,5 +238,6 @@ module.exports = {
   createContentFacade,
   createWordLookupController,
   freezeWordOriginSnapshot,
+  freezeReaderOriginSnapshot,
   installContentFacade,
 };
