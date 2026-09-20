@@ -274,10 +274,12 @@ class AnkiRepository {
       captures.put(capture);
 
       if (hasMeaning) {
+        jobs.delete(`${captureId}:enrich`);
         const job = createJob(captureId, 'push', capture.updatedAt, { revision: capture.contentRevision });
         const previous = await requestResult(jobs.get(job.jobId));
         jobs.put({ ...previous, ...job, attemptCount: previous?.attemptCount || 0 });
       } else {
+        jobs.delete(`${captureId}:push`);
         const job = createJob(captureId, 'enrich', capture.updatedAt, {
           revision: capture.contentRevision,
           generation: capture.enrichmentGeneration,
@@ -559,6 +561,7 @@ class AnkiRepository {
       capture.contentState = 'pending';
       capture.updatedAt = this.now();
       captures.put(capture);
+      jobs.delete(`${captureId}:push`);
       jobs.put(createJob(captureId, 'enrich', capture.updatedAt, {
         revision: capture.contentRevision,
         generation: capture.enrichmentGeneration,

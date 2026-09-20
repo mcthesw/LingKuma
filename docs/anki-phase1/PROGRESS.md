@@ -14,7 +14,7 @@
 | T05 | PASS | 本任务提交 | `npm run test:anki`：模板、兼容性、正确目标强调及恶意HTML/media/source输入全部通过 | 真实Anki卡片外观留T20 |
 | T06 | PASS | 本任务提交 | `npm run test:anki:integration`：立即持久化、重复/新语境、异常状态、编辑/再生成/排除/恢复13/13通过 | 暂未接网页UI，按任务留T13/T14 |
 | T07 | PASS | 本任务提交 | `npm run test:anki`：结构化释义、注入边界、错误分类和Abort共53/53 unit通过 | 未调用真实AI，留T20 |
-| T08 | TODO | — | — | — |
+| T08 | PASS | 本任务提交 | `npm run test:anki`：single-flight、乱序、重启、generation、编辑、有限重试及恢复共20/20 integration通过 | 调度/alarms并发预算留T11 |
 | T09 | TODO | — | — | — |
 | T10 | TODO | — | — | — |
 | T11 | TODO | — | — | — |
@@ -138,6 +138,18 @@
 回归检查：遗留 `makeAIRequest` message、用户自定义prompt和provider选择逻辑未改；构建成功且仅有原有体积警告；没有加载a3到worker或新增provider配置。
 提交：本任务提交。
 下一任务：T08，实现持久化释义任务及过期结果防护。
+
+### T08
+
+实际基线：capture与enrich job已原子落盘，provider已提供严格结构化结果；尚无持久任务执行协调层。
+修改文件：`src/anki/enrichment.js`、`src/anki/repository.js`、`tests/anki/integration/enrichment.test.js`、本记录。
+行为变化：enrichment按持久化capture/generation取原始语境并single-flight调用provider；有效meaning在一次事务内写回内容、递增revision并投递push；临时失败最多三次带退避，永久失败保留原句且不投递空卡；编辑和重新生成原子替换旧enrich/push任务，迟到结果因lease/generation失效。
+测试命令：`npm run test:anki`。
+实际结果：unit 53/53、integration 20/20、e2e 1/1通过；同摘录十次查询仅一次provider；A/B逆序各自写回；无UI和关闭重开后任务继续；人工编辑及连续generation拒绝迟到结果；两次失败后恢复，三次无效后停止且显式再生成可恢复；订阅DTO与持久内容同源。
+未运行的验收：真实AI中断和浏览器worker kill留T20；alarms、并发预算与跨worker drain接线按依赖留T11。
+回归检查：构建成功且仅有原有体积警告；原始context不被provider结果替换；无有效meaning时没有push任务；optional字段为空不阻断有效meaning。
+提交：本任务提交。
+下一任务：T09，实现幂等创建和未知结果恢复。
 
 ## 最终真实环境验收
 
