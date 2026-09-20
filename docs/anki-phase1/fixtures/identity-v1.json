@@ -1,0 +1,398 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Golden vectors for ARCHITECTURE section 5. Implementations must use UTF-16 offsets and UTF-8 hashing. Expected values must not be regenerated using the implementation under test.",
+  "cases": [
+    {
+      "name": "basic-yields",
+      "input": {
+        "language": "en",
+        "term": "yields",
+        "contextText": "The iterator yields each matching record lazily.",
+        "targetStart": 13,
+        "targetEnd": 19,
+        "contextQuality": "sentence",
+        "fallbackSourceKey": ""
+      },
+      "expected": {
+        "normalizedTerm": "yields",
+        "normalizedContext": "The iterator yields each matching record lazily.",
+        "normalizedStart": 13,
+        "normalizedEnd": 19,
+        "identityTuple": [
+          1,
+          "en",
+          "yields",
+          "The iterator yields each matching record lazily.",
+          13,
+          19,
+          ""
+        ],
+        "captureId": "lk1_151cec0fe0e90ec4ec674932e6e7099b446625efe19a979d3b57ae290b4433b1"
+      }
+    },
+    {
+      "name": "same-context-whitespace",
+      "input": {
+        "language": "en",
+        "term": "yields",
+        "contextText": "  The\niterator yields  each matching record lazily.  ",
+        "targetStart": 15,
+        "targetEnd": 21,
+        "contextQuality": "sentence",
+        "fallbackSourceKey": ""
+      },
+      "expected": {
+        "normalizedTerm": "yields",
+        "normalizedContext": "The iterator yields each matching record lazily.",
+        "normalizedStart": 13,
+        "normalizedEnd": 19,
+        "identityTuple": [
+          1,
+          "en",
+          "yields",
+          "The iterator yields each matching record lazily.",
+          13,
+          19,
+          ""
+        ],
+        "captureId": "lk1_151cec0fe0e90ec4ec674932e6e7099b446625efe19a979d3b57ae290b4433b1"
+      }
+    },
+    {
+      "name": "new-context-same-word",
+      "input": {
+        "language": "en",
+        "term": "yields",
+        "contextText": "This process yields useful information.",
+        "targetStart": 13,
+        "targetEnd": 19,
+        "contextQuality": "sentence",
+        "fallbackSourceKey": ""
+      },
+      "expected": {
+        "normalizedTerm": "yields",
+        "normalizedContext": "This process yields useful information.",
+        "normalizedStart": 13,
+        "normalizedEnd": 19,
+        "identityTuple": [
+          1,
+          "en",
+          "yields",
+          "This process yields useful information.",
+          13,
+          19,
+          ""
+        ],
+        "captureId": "lk1_6735a8e7c0aa64309dc6120578a8fd6bd0cc9f730196d425f0b5c0de6fadf8be"
+      }
+    },
+    {
+      "name": "first-bank",
+      "input": {
+        "language": "en",
+        "term": "bank",
+        "contextText": "A bank is near another bank.",
+        "targetStart": 2,
+        "targetEnd": 6,
+        "contextQuality": "sentence",
+        "fallbackSourceKey": ""
+      },
+      "expected": {
+        "normalizedTerm": "bank",
+        "normalizedContext": "A bank is near another bank.",
+        "normalizedStart": 2,
+        "normalizedEnd": 6,
+        "identityTuple": [
+          1,
+          "en",
+          "bank",
+          "A bank is near another bank.",
+          2,
+          6,
+          ""
+        ],
+        "captureId": "lk1_50182b00d5b559a47840b0df43c5cf4e9a4cb66fda0451958375f67417a51a79"
+      }
+    },
+    {
+      "name": "second-bank",
+      "input": {
+        "language": "en",
+        "term": "bank",
+        "contextText": "A bank is near another bank.",
+        "targetStart": 23,
+        "targetEnd": 27,
+        "contextQuality": "sentence",
+        "fallbackSourceKey": ""
+      },
+      "expected": {
+        "normalizedTerm": "bank",
+        "normalizedContext": "A bank is near another bank.",
+        "normalizedStart": 23,
+        "normalizedEnd": 27,
+        "identityTuple": [
+          1,
+          "en",
+          "bank",
+          "A bank is near another bank.",
+          23,
+          27,
+          ""
+        ],
+        "captureId": "lk1_15f18690345bc3ec2177be2aadcf7626a5c1feb21f289911b80389584d8b32d3"
+      }
+    },
+    {
+      "name": "upper-US",
+      "input": {
+        "language": "en",
+        "term": "US",
+        "contextText": "They asked US and us.",
+        "targetStart": 11,
+        "targetEnd": 13,
+        "contextQuality": "sentence",
+        "fallbackSourceKey": ""
+      },
+      "expected": {
+        "normalizedTerm": "US",
+        "normalizedContext": "They asked US and us.",
+        "normalizedStart": 11,
+        "normalizedEnd": 13,
+        "identityTuple": [
+          1,
+          "en",
+          "US",
+          "They asked US and us.",
+          11,
+          13,
+          ""
+        ],
+        "captureId": "lk1_1a48283f187c6524070bd6c5bcb729afbb4a5a2678c7e3826e5ec8e6b8e92c7c"
+      }
+    },
+    {
+      "name": "lower-us",
+      "input": {
+        "language": "en",
+        "term": "us",
+        "contextText": "They asked US and us.",
+        "targetStart": 18,
+        "targetEnd": 20,
+        "contextQuality": "sentence",
+        "fallbackSourceKey": ""
+      },
+      "expected": {
+        "normalizedTerm": "us",
+        "normalizedContext": "They asked US and us.",
+        "normalizedStart": 18,
+        "normalizedEnd": 20,
+        "identityTuple": [
+          1,
+          "en",
+          "us",
+          "They asked US and us.",
+          18,
+          20,
+          ""
+        ],
+        "captureId": "lk1_b3fec2eb5cd885fe429965785328ac86461c4fa703f89f0c1fb78444979a4dc3"
+      }
+    },
+    {
+      "name": "phrase",
+      "input": {
+        "language": "en",
+        "term": "break the ice",
+        "contextText": "We need to break the ice.",
+        "targetStart": 11,
+        "targetEnd": 24,
+        "contextQuality": "sentence",
+        "fallbackSourceKey": ""
+      },
+      "expected": {
+        "normalizedTerm": "break the ice",
+        "normalizedContext": "We need to break the ice.",
+        "normalizedStart": 11,
+        "normalizedEnd": 24,
+        "identityTuple": [
+          1,
+          "en",
+          "break the ice",
+          "We need to break the ice.",
+          11,
+          24,
+          ""
+        ],
+        "captureId": "lk1_13c4622846d187c5f6db01884e574078f721d94ed65ad6e8452f607240f1486d"
+      }
+    },
+    {
+      "name": "nfc-cafe",
+      "input": {
+        "language": "fr",
+        "term": "café",
+        "contextText": "The café is open.",
+        "targetStart": 4,
+        "targetEnd": 8,
+        "contextQuality": "sentence",
+        "fallbackSourceKey": ""
+      },
+      "expected": {
+        "normalizedTerm": "café",
+        "normalizedContext": "The café is open.",
+        "normalizedStart": 4,
+        "normalizedEnd": 8,
+        "identityTuple": [
+          1,
+          "fr",
+          "café",
+          "The café is open.",
+          4,
+          8,
+          ""
+        ],
+        "captureId": "lk1_efee8ce59b7f716e3c1d51db9f47ffb858217bcf961775c51d23a62a993f91f3"
+      }
+    },
+    {
+      "name": "nfd-cafe",
+      "input": {
+        "language": "fr",
+        "term": "café",
+        "contextText": "The café is open.",
+        "targetStart": 4,
+        "targetEnd": 9,
+        "contextQuality": "sentence",
+        "fallbackSourceKey": ""
+      },
+      "expected": {
+        "normalizedTerm": "café",
+        "normalizedContext": "The café is open.",
+        "normalizedStart": 4,
+        "normalizedEnd": 8,
+        "identityTuple": [
+          1,
+          "fr",
+          "café",
+          "The café is open.",
+          4,
+          8,
+          ""
+        ],
+        "captureId": "lk1_efee8ce59b7f716e3c1d51db9f47ffb858217bcf961775c51d23a62a993f91f3"
+      }
+    },
+    {
+      "name": "emoji-before-target",
+      "input": {
+        "language": "en",
+        "term": "yields",
+        "contextText": "🦊 The fox yields.",
+        "targetStart": 11,
+        "targetEnd": 17,
+        "contextQuality": "sentence",
+        "fallbackSourceKey": ""
+      },
+      "expected": {
+        "normalizedTerm": "yields",
+        "normalizedContext": "🦊 The fox yields.",
+        "normalizedStart": 11,
+        "normalizedEnd": 17,
+        "identityTuple": [
+          1,
+          "en",
+          "yields",
+          "🦊 The fox yields.",
+          11,
+          17,
+          ""
+        ],
+        "captureId": "lk1_3a9da12fb35230c20bda9f5997bedd5ae91d03c4b22ab587c5aa5e500c49bbe3"
+      }
+    },
+    {
+      "name": "selection-only-source-a",
+      "input": {
+        "language": "en",
+        "term": "yield",
+        "contextText": "yield",
+        "targetStart": 0,
+        "targetEnd": 5,
+        "contextQuality": "selection_only",
+        "fallbackSourceKey": "web:https://example.test/a"
+      },
+      "expected": {
+        "normalizedTerm": "yield",
+        "normalizedContext": "yield",
+        "normalizedStart": 0,
+        "normalizedEnd": 5,
+        "identityTuple": [
+          1,
+          "en",
+          "yield",
+          "yield",
+          0,
+          5,
+          "web:https://example.test/a"
+        ],
+        "captureId": "lk1_b5d63069223ed36bd1173b4091679e61949fac9c352dbfe4f8a33eac7b0e42e2"
+      }
+    },
+    {
+      "name": "selection-only-source-b",
+      "input": {
+        "language": "en",
+        "term": "yield",
+        "contextText": "yield",
+        "targetStart": 0,
+        "targetEnd": 5,
+        "contextQuality": "selection_only",
+        "fallbackSourceKey": "web:https://example.test/b"
+      },
+      "expected": {
+        "normalizedTerm": "yield",
+        "normalizedContext": "yield",
+        "normalizedStart": 0,
+        "normalizedEnd": 5,
+        "identityTuple": [
+          1,
+          "en",
+          "yield",
+          "yield",
+          0,
+          5,
+          "web:https://example.test/b"
+        ],
+        "captureId": "lk1_d4077de04683aa0d86fa29dd6def1cc95bdcdabecac32adc674caf1c6f5e48d3"
+      }
+    },
+    {
+      "name": "normal-source-does-not-change-id",
+      "input": {
+        "language": "en",
+        "term": "yields",
+        "contextText": "The iterator yields each matching record lazily.",
+        "targetStart": 13,
+        "targetEnd": 19,
+        "contextQuality": "sentence",
+        "fallbackSourceKey": "https://other.test/ignored"
+      },
+      "expected": {
+        "normalizedTerm": "yields",
+        "normalizedContext": "The iterator yields each matching record lazily.",
+        "normalizedStart": 13,
+        "normalizedEnd": 19,
+        "identityTuple": [
+          1,
+          "en",
+          "yields",
+          "The iterator yields each matching record lazily.",
+          13,
+          19,
+          ""
+        ],
+        "captureId": "lk1_151cec0fe0e90ec4ec674932e6e7099b446625efe19a979d3b57ae290b4433b1"
+      }
+    }
+  ]
+}
