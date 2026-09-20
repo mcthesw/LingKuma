@@ -9,6 +9,8 @@ const {
   transactionDone,
 } = require('./indexeddb-store');
 const {
+  adoptExisting: adoptExistingTransaction,
+  recordRemoteDifference: recordRemoteDifferenceTransaction,
   requestRecreate: requestRecreateTransaction,
   resolveRemoteDifference: resolveRemoteDifferenceTransaction,
 } = require('./reconciliation-store');
@@ -22,7 +24,7 @@ const {
 const DATABASE_NAME = 'lingkuma-anki-v1';
 const DATABASE_VERSION = 1;
 const STORE_NAMES = Object.freeze(['captures', 'jobs', 'media', 'meta']);
-const JOB_KINDS = Object.freeze(['enrich', 'push', 'media']);
+const JOB_KINDS = Object.freeze(['enrich', 'push', 'media', 'inspect']);
 const CONTENT_TO_ANKI_FIELD = Object.freeze({
   term: 'Term',
   contextText: 'Context',
@@ -165,6 +167,7 @@ class AnkiRepository {
           contentRevision: 0,
           enrichmentGeneration: 1,
           dirtyFields: hasMeaning ? Object.values(CONTENT_TO_ANKI_FIELD) : [],
+          locallyEditedFields: [],
           active: true,
           createdAt: now,
           updatedAt: now,
@@ -255,19 +258,20 @@ class AnkiRepository {
       capture.contentRevision += 1;
       capture.enrichmentGeneration += 1;
       capture.updatedAt = this.now();
-      capture.dirtyFields = mergeDirtyFields(
-        capture.dirtyFields,
-        changedKeys.map(key => CONTENT_TO_ANKI_FIELD[key]).filter(Boolean),
-      );
+      const changedFields = changedKeys.map(key => CONTENT_TO_ANKI_FIELD[key]).filter(Boolean);
+      capture.dirtyFields = mergeDirtyFields(capture.dirtyFields, changedFields);
+      capture.locallyEditedFields = mergeDirtyFields(capture.locallyEditedFields, changedFields);
       const hasMeaning = typeof capture.content.meaning === 'string' && capture.content.meaning.trim().length > 0;
       capture.contentState = hasMeaning ? 'ready' : 'pending';
       captures.put(capture);
 
       if (hasMeaning) {
         jobs.delete(`${captureId}:enrich`);
-        const job = createJob(captureId, 'push', capture.updatedAt, { revision: capture.contentRevision });
-        const previous = await requestResult(jobs.get(job.jobId));
-        jobs.put({ ...previous, ...job, attemptCount: previous?.attemptCount || 0 });
+        if (!['conflict', 'remote_missing', 'blocked'].includes(capture.link.deliveryState)) {
+          const job = createJob(captureId, 'push', capture.updatedAt, { revision: capture.contentRevision });
+          const previous = await requestResult(jobs.get(job.jobId));
+          jobs.put({ ...previous, ...job, attemptCount: previous?.attemptCount || 0 });
+        }
       } else {
         jobs.delete(`${captureId}:push`);
         const job = createJob(captureId, 'enrich', capture.updatedAt, {
@@ -452,24 +456,18 @@ class AnkiRepository {
     }
   }
 
-  async recordRemoteDifference(captureId, observedFields, reason = 'REMOTE_CHANGED') {
-    try {
-      const transaction = this.database.transaction('captures', 'readwrite');
-      const store = transaction.objectStore('captures');
-      const capture = await requestResult(store.get(captureId));
-      if (!capture) {
-        throw new ContractError('INPUT_INVALID', 'Capture does not exist.');
-      }
-      capture.link.deliveryState = 'conflict';
-      capture.link.observedRemoteFields = clone(observedFields);
-      capture.link.lastError = { code: reason, retryable: false };
-      capture.updatedAt = this.now();
-      store.put(capture);
-      await transactionDone(transaction);
-      return clone(capture);
-    } catch (error) {
-      throw storageError(error);
-    }
+  recordRemoteDifference(captureId, observedFields, reason = 'REMOTE_CHANGED') {
+    return recordRemoteDifferenceTransaction(this, captureId, observedFields, reason);
+  }
+
+  adoptExisting(captureId, expectedRevision, jobToken, observedFields, noteId) {
+    return adoptExistingTransaction(this, {
+      captureId,
+      expectedRevision,
+      jobToken,
+      observedFields,
+      noteId,
+    });
   }
 
   resolveRemoteDifference(captureId, expectedRevision, observedFields, noteId, localFields) {

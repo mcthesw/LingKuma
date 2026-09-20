@@ -85,6 +85,10 @@ class JobScheduler {
     syncService,
     alarmClock,
     mediaService = { processClaimedJob: async () => ({ status: 'idle' }) },
+    reconciliationService = {
+      ensureJobs: async () => 0,
+      processClaimedJob: async () => ({ status: 'idle' }),
+    },
     now = Date.now,
     monotonicNow = () => globalThis.performance?.now?.() ?? Date.now(),
     createOwner = createOwnerToken,
@@ -108,6 +112,7 @@ class JobScheduler {
     this.enrichmentCoordinator = enrichmentCoordinator;
     this.syncService = syncService;
     this.mediaService = mediaService;
+    this.reconciliationService = reconciliationService;
     this.alarmClock = alarmClock;
     this.now = now;
     this.monotonicNow = monotonicNow;
@@ -152,6 +157,9 @@ class JobScheduler {
     if (!backoff.blockedCode && Number.isFinite(schedule.nextByKind.push)) {
       candidates.push(Math.max(schedule.nextByKind.push, backoff.nextAttemptAt || 0));
     }
+    if (!backoff.blockedCode && Number.isFinite(schedule.nextByKind.inspect)) {
+      candidates.push(Math.max(schedule.nextByKind.inspect, backoff.nextAttemptAt || 0));
+    }
     if (!backoff.blockedCode && Number.isFinite(schedule.nextByKind.media)) {
       candidates.push(Math.max(schedule.nextByKind.media, backoff.nextAttemptAt || 0));
     }
@@ -171,10 +179,12 @@ class JobScheduler {
   async #drainBatch() {
     const startedAt = this.monotonicNow();
     let processed = 0;
+    await this.reconciliationService.ensureJobs();
     processed += await this.#drainEnrichment(startedAt, processed);
     if (this.#hasBudget(startedAt, processed)) {
       processed += await this.#drainAnki(startedAt, processed);
     }
+    await this.reconciliationService.ensureJobs();
     const nextWakeAt = await this.ensureWakeup();
     return Object.freeze({ processed, nextWakeAt });
   }
@@ -213,8 +223,10 @@ class JobScheduler {
         service = this.mediaService;
       }
       if (!job) {
-        break;
+        job = await this.repository.claimDueJob('inspect', this.now(), this.#nextOwner('inspect'), this.leaseMs);
+        service = this.reconciliationService;
       }
+      if (!job) break;
       const result = await service.processClaimedJob(job);
       processed += 1;
       const code = result.error?.code;

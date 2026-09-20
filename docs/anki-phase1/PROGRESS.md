@@ -247,6 +247,18 @@
 提交：本任务提交。
 下一任务：T17，实现关联重绑定与本机外部变更巡检。
 
+### T17
+
+实际基线：稳定CaptureId查找已在每次写入前执行，但无本地基线且远端内容不同会被误判为冲突，无法安全接管由Anki同步回来的既有笔记；关联记录只在下一次写入或手动打开时被核对，没有持久化低频巡检任务，也不能区分生成内容与首次绑定前的人工编辑。
+修改文件：`src/anki/association-store.js`、`src/anki/reconciliation-service.js`、`src/anki/reconciliation-store.js`、`src/anki/sync-service.js`、`src/anki/repository.js`、`src/anki/scheduler.js`、`src/anki/management-service.js`、`src/anki/manager.js`、`src/anki/background-runtime.js`、`tests/anki/integration/reconciliation.test.js`、`tests/anki/integration/management-service.test.js`、本记录。
+行为变化：记录人工修改字段来源；首次按CaptureId找到已有远端且本地未人工编辑时，原子接管远端noteId和字段基线、清空生成脏字段，不add、不update；首次绑定前已人工编辑则保留双方并进入冲突。新增每条已关联记录独立的持久化`inspect`任务，默认六小时低频核对，启动/每批结束补种，沿用Anki全局退避并与push/media串行；每次只按一个CaptureId调用findNotes/notesInfo，不扫描牌组或collection。巡检识别外部编辑、删除、同ID多笔记，并在字段未变时安全更新变化后的noteId。管理编辑和打开前立即核对，页面增加“核对 Anki”；冲突、缺失、阻止状态下的本地编辑保留脏字段但不排入自动写入。界面只展示本机Anki核实时间和状态，不推断AnkiWeb或手机同步。
+测试命令：`node --test tests/anki/integration/reconciliation.test.js tests/anki/integration/management-service.test.js`；`npm run test:anki`；`browser-use`加载最终`dist/src/anki/manager.html`，注入受控管理DTO并点击“核对 Anki”。
+实际结果：targeted 8/8通过；全套unit 67/67、integration 60/60、e2e 1/1通过，构建仅有既有包体积警告。A41证明远端不同释义被接管且add/update均为0，首次绑定前人工编辑进入冲突；A42证明定时任务发现外部编辑、删除、noteId变化和同ID多笔记，noteId变化且字段相同自动重绑定；管理编辑/打开改为先即时核对。A43动作日志中`sync`、`loadProfile`和排程修改API均为0，巡检只查询四个目标CaptureId。最终页面显示单一“核对 Anki”操作，点击后状态为“已完成”且最后核实时间更新。
+未运行的验收：六小时间隔以受控时钟推进，未等待真实六小时；未触碰用户真实Anki或AnkiWeb，真实外部编辑/删除链留T20专用测试记录。浏览器使用受控后台DTO，IndexedDB与Anki调用由集成测试覆盖；Firefox仍未安装。
+回归检查：检查任务持久化且worker重启后可补种；push、media、inspect仍共享单一串行Anki通道和全局退避。远端冲突/缺失会删除待写push，必须经既有显式冲突解决或重建恢复；停止管理删除全部任务。没有调用sync/loadProfile、没有修改Known、没有实现远程队列或跨设备恰好一次承诺。
+提交：本任务提交。
+下一任务：T18，实现安全备份与恢复。
+
 ## 最终真实环境验收
 
 Anki版本 / Connect协议与能力：

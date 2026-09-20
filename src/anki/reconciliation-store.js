@@ -8,6 +8,62 @@ const {
   transactionDone,
 } = require('./indexeddb-store');
 
+async function adoptExisting(repository, {
+  captureId,
+  expectedRevision,
+  jobToken,
+  observedFields,
+  noteId,
+}) {
+  try {
+    const transaction = repository.database.transaction(['captures', 'jobs'], 'readwrite');
+    const captures = transaction.objectStore('captures');
+    const jobs = transaction.objectStore('jobs');
+    const job = await requestResult(jobs.get(jobToken.jobId));
+    const capture = await requestResult(captures.get(captureId));
+    if (!job || job.leaseOwner !== jobToken.ownerToken
+        || !capture || capture.contentRevision !== expectedRevision
+        || capture.link.baseFields || (capture.locallyEditedFields || []).length > 0) {
+      await transactionDone(transaction);
+      return null;
+    }
+    capture.link.baseFields = clone(observedFields);
+    capture.link.noteIdHint = noteId;
+    capture.link.wasLinked = true;
+    capture.link.deliveryState = 'synced';
+    capture.link.pendingWrite = null;
+    capture.link.lastVerifiedAt = repository.now();
+    capture.link.lastError = null;
+    capture.link.observedRemoteFields = null;
+    capture.dirtyFields = [];
+    capture.updatedAt = repository.now();
+    captures.put(capture);
+    jobs.delete(job.jobId);
+    await transactionDone(transaction);
+    return clone(capture);
+  } catch (error) {
+    throw storageError(error);
+  }
+}
+
+async function recordRemoteDifference(repository, captureId, observedFields, reason) {
+  try {
+    const transaction = repository.database.transaction('captures', 'readwrite');
+    const store = transaction.objectStore('captures');
+    const capture = await requestResult(store.get(captureId));
+    if (!capture) throw new ContractError('INPUT_INVALID', 'Capture does not exist.');
+    capture.link.deliveryState = 'conflict';
+    capture.link.observedRemoteFields = clone(observedFields);
+    capture.link.lastError = { code: reason, retryable: false };
+    capture.updatedAt = repository.now();
+    store.put(capture);
+    await transactionDone(transaction);
+    return clone(capture);
+  } catch (error) {
+    throw storageError(error);
+  }
+}
+
 async function resolveRemoteDifference(repository, createJob, {
   captureId,
   expectedRevision,
@@ -85,6 +141,8 @@ async function requestRecreate(repository, createJob, contentFields, captureId, 
 }
 
 module.exports = {
+  adoptExisting,
+  recordRemoteDifference,
   requestRecreate,
   resolveRemoteDifference,
 };

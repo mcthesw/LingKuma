@@ -38,11 +38,22 @@ function captureIdFrom(payload) {
 }
 
 class ManagementService {
-  constructor({ repository, managementStore, captureService, syncService, ankiClient, scheduleDrain = () => {} } = {}) {
+  constructor({
+    repository,
+    managementStore,
+    captureService,
+    syncService,
+    reconciliationService = { inspectNow: async () => null },
+    ankiClient,
+    scheduleDrain = () => {},
+  } = {}) {
     if (!repository || !managementStore || !captureService || !syncService || !ankiClient) {
       throw new TypeError('Management dependencies are required.');
     }
-    Object.assign(this, { repository, managementStore, captureService, syncService, ankiClient, scheduleDrain });
+    Object.assign(this, {
+      repository, managementStore, captureService, syncService,
+      reconciliationService, ankiClient, scheduleDrain,
+    });
   }
 
   async list(payload = {}) {
@@ -65,9 +76,19 @@ class ManagementService {
     return Object.freeze({ items: result.items.map(managementDto), nextCursor: result.nextCursor });
   }
 
-  async edit(payload) {
+  async edit(payload, options) {
+    const capture = await this.repository.getCapture(payload?.captureId);
+    if (capture?.active && capture.destination && capture.link?.wasLinked) {
+      await this.reconciliationService.inspectNow(capture.captureId, options);
+    }
     const result = await this.captureService.edit(payload);
     return managementDto(await this.repository.getCapture(result.captureId));
+  }
+
+  async inspect(payload, options) {
+    const captureId = captureIdFrom(payload);
+    await this.reconciliationService.inspectNow(captureId, options);
+    return managementDto(await this.repository.getCapture(captureId));
   }
 
   async regenerate(payload) {
@@ -111,22 +132,20 @@ class ManagementService {
     return managementDto(retried);
   }
 
-  async openInAnki(payload, { signal } = {}) {
+  async openInAnki(payload, options) {
     const captureId = captureIdFrom(payload);
+    await this.reconciliationService.inspectNow(captureId, options);
     const capture = await this.repository.getCapture(captureId);
-    if (!capture?.destination || !capture.link?.wasLinked) {
-      throw new ContractError('REMOTE_MISSING', 'This capture has no linked Anki note.');
+    if (!capture?.destination || !capture.link?.wasLinked
+        || capture.link.deliveryState === 'remote_missing'
+        || !Number.isSafeInteger(capture.link.noteIdHint)) {
+      throw new ContractError('REMOTE_MISSING', 'The linked Anki note is not available.');
     }
-    await this.ankiClient.getProfileStatus(capture.destination.expectedProfile || null, { signal });
-    const ids = await this.ankiClient.findNotesByCaptureId(captureId, { signal });
-    if (!Array.isArray(ids) || ids.length === 0) throw new ContractError('REMOTE_MISSING', 'The linked Anki note no longer exists.');
-    if (ids.length !== 1) throw new ContractError('MULTIPLE_MATCHES', 'Multiple Anki notes have this capture identity.');
-    const notes = await this.ankiClient.notesInfo(ids, { signal });
-    const note = Array.isArray(notes) && notes.length === 1 ? notes[0] : null;
-    if (note?.fields?.CaptureId?.value !== captureId || note.modelName !== capture.destination.modelName) {
-      throw new ContractError('IDENTITY_MISMATCH', 'The linked Anki note identity does not match.');
+    if (capture.link.deliveryState === 'conflict') {
+      const code = capture.link.lastError?.code || 'REMOTE_CHANGED';
+      throw new ContractError(code, 'Resolve the Anki identity or field conflict before opening this note.');
     }
-    await this.ankiClient.guiBrowseNote(note.noteId, { signal });
+    await this.ankiClient.guiBrowseNote(capture.link.noteIdHint, options);
     return Object.freeze({ opened: true });
   }
 }

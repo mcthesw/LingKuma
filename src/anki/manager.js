@@ -100,7 +100,7 @@ function renderRecord(item) {
   }
   const actions = article.querySelector('.actions');
   if (item.active) {
-    actions.append(button('编辑', 'edit'), button('在 Anki 中打开', 'open'));
+    actions.append(button('编辑', 'edit'), button('核对 Anki', 'inspect'), button('在 Anki 中打开', 'open'));
     if (item.status === 'content_failed' || item.status === 'blocked'
         || (item.status === 'conflict' && !item.remoteFields)
         || ['failed', 'unavailable'].includes(item.mediaState)) {
@@ -184,6 +184,7 @@ async function handleAction(event) {
   try {
     if (action === 'edit') article.querySelector('.edit-form').hidden = false;
     else if (action === 'cancel-edit') article.querySelector('.edit-form').hidden = true;
+    else if (action === 'inspect') await runCommand(article, 'capture.inspect', { captureId: item.captureId });
     else if (action === 'open') await runCommand(article, 'capture.openInAnki', { captureId: item.captureId });
     else if (action === 'exclude') await runCommand(article, 'capture.exclude', { captureId: item.captureId });
     else if (action === 'resume') await runCommand(article, 'capture.resume', { captureId: item.captureId });

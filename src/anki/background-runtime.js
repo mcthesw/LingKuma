@@ -1,6 +1,7 @@
 'use strict';
 
 const { AnkiConnectClient } = require('./anki-client');
+const { AssociationStore } = require('./association-store');
 const { createSupertoneAudioProvider } = require('./audio-provider');
 const { CaptureService } = require('./capture-service');
 const { ContractError } = require('./contracts');
@@ -10,6 +11,7 @@ const { ManagementService } = require('./management-service');
 const { ManagementStore } = require('./management-store');
 const { MediaStore } = require('./media-store');
 const { createProviderAdapter } = require('./provider-adapter');
+const { ReconciliationService } = require('./reconciliation-service');
 const { openAnkiRepository } = require('./repository');
 const {
   ANKI_ALARM_NAME,
@@ -144,11 +146,18 @@ function initializeAnkiBackground({
       ankiClient,
       notifyCaptureChanged: captureNotifier.notify,
     });
+    const reconciliationService = new ReconciliationService({
+      repository,
+      associationStore: new AssociationStore(repository),
+      ankiClient,
+      notifyCaptureChanged: captureNotifier.notify,
+    });
     const scheduler = new JobScheduler({
       repository,
       enrichmentCoordinator,
       syncService,
       mediaService,
+      reconciliationService,
       alarmClock: new BrowserAlarmClock(browserApi),
     });
     const captureService = new CaptureService({
@@ -162,6 +171,7 @@ function initializeAnkiBackground({
       managementStore: new ManagementStore(repository),
       captureService,
       syncService,
+      reconciliationService,
       ankiClient,
       scheduleDrain: reason => scheduler.scheduleDrain(reason),
     });
@@ -196,6 +206,7 @@ function initializeAnkiBackground({
       return result;
     }),
     'capture.list': trusted(async payload => (await services).managementService.list(payload || {})),
+    'capture.inspect': trusted(async payload => (await services).managementService.inspect(payload || {})),
     'capture.edit': trusted(async payload => (await services).managementService.edit(payload || {})),
     'capture.regenerate': trusted(async payload => (await services).managementService.regenerate(payload || {})),
     'capture.retry': trusted(async payload => (await services).managementService.retry(payload || {})),

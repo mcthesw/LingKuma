@@ -65,6 +65,41 @@ function changedFieldPatch(baseFields, desiredFields, fieldNames) {
     .map(name => [name, desiredFields[name]]));
 }
 
+async function verifyDestination(ankiClient, destination, signal) {
+  const modelName = destination.modelName || MODEL_NAME;
+  await ankiClient.getProfileStatus(destination.expectedProfile, { signal });
+  await assertDeckExists(ankiClient, destination.deckName);
+  assertCompatibleModelFields(await ankiClient.modelFieldNames(modelName, { signal }));
+}
+
+async function locateCaptureNote(ankiClient, capture, signal) {
+  const ids = await ankiClient.findNotesByCaptureId(capture.captureId, { signal });
+  if (!Array.isArray(ids) || ids.some(id => !Number.isSafeInteger(id) || id <= 0)
+      || new Set(ids).size !== ids.length) {
+    throw new ContractError('API_UNSUPPORTED', 'findNotes returned invalid note ids.');
+  }
+  if (ids.length === 0) return { kind: 'none' };
+  const infos = await ankiClient.notesInfo(ids, { signal });
+  if (!Array.isArray(infos) || infos.length !== ids.length) {
+    throw new ContractError('API_UNSUPPORTED', 'notesInfo did not return every requested note.');
+  }
+  const matches = [];
+  for (const info of infos) {
+    const fields = readNoteFields(info);
+    if (info.modelName !== (capture.destination.modelName || MODEL_NAME)) {
+      throw new ContractError('MODEL_INCOMPATIBLE', 'The matching Anki note uses an incompatible note type.');
+    }
+    if (fields.CaptureId !== capture.captureId) {
+      return { kind: 'conflict', code: 'IDENTITY_MISMATCH' };
+    }
+    matches.push({ noteId: info.noteId, fields });
+  }
+  if (matches.length !== 1) {
+    return { kind: 'conflict', code: 'MULTIPLE_MATCHES', count: matches.length };
+  }
+  return { kind: 'one', ...matches[0] };
+}
+
 class SyncService {
   constructor({
     repository,
@@ -266,27 +301,34 @@ class SyncService {
     if (recovered && recovered.status !== 'not_applied') {
       return recovered;
     }
-
     const baseFields = capture.link.baseFields;
+
     if (!baseFields) {
       if (!fieldsEqual(located.fields, renderedFields)) {
-        return this.#remoteConflict(job, token, located.fields,
-          'The existing Anki note differs from local content and has no verified baseline.');
+        if ((capture.locallyEditedFields || []).length > 0) {
+          return this.#remoteConflict(job, token, located.fields,
+            'The existing Anki note differs from locally edited content and has no verified baseline.');
+        }
+        const adopted = await this.repository.adoptExisting(
+          capture.captureId,
+          capture.contentRevision,
+          token,
+          located.fields,
+          located.noteId,
+        );
+        if (!adopted) return Object.freeze({ status: 'stale', captureId: capture.captureId });
+        this.#notify(adopted);
+        return Object.freeze({
+          status: 'committed',
+          capture: toPublicCaptureDto(adopted),
+          noteId: located.noteId,
+        });
       }
       const prepared = await this.repository.prepareWrite(
-        capture.captureId,
-        capture.contentRevision,
-        renderedFields,
-        null,
-        {
-          opId: this.createOperationId(),
-          kind: 'create',
-          jobToken: token,
-          submittedFields: capture.dirtyFields,
-        },
+        capture.captureId, capture.contentRevision, renderedFields, null,
+        { opId: this.createOperationId(), kind: 'create', jobToken: token, submittedFields: capture.dirtyFields },
       );
-      return prepared
-        ? this.#confirm(job, token, prepared.opId, located)
+      return prepared ? this.#confirm(job, token, prepared.opId, located)
         : Object.freeze({ status: 'stale', captureId: capture.captureId });
     }
 
@@ -370,41 +412,12 @@ class SyncService {
     throw new ContractError('ANKI_UNREACHABLE', 'The updated Anki note could not be verified.', { retryable: true });
   }
 
-  async #verifyDestination(destination, signal) {
-    const modelName = destination.modelName || MODEL_NAME;
-    await this.ankiClient.getProfileStatus(destination.expectedProfile, { signal });
-    await assertDeckExists(this.ankiClient, destination.deckName);
-    assertCompatibleModelFields(await this.ankiClient.modelFieldNames(modelName, { signal }));
+  #verifyDestination(destination, signal) {
+    return verifyDestination(this.ankiClient, destination, signal);
   }
 
-  async #locate(capture, signal) {
-    const ids = await this.ankiClient.findNotesByCaptureId(capture.captureId, { signal });
-    if (!Array.isArray(ids) || ids.some(id => !Number.isSafeInteger(id) || id <= 0)
-        || new Set(ids).size !== ids.length) {
-      throw new ContractError('API_UNSUPPORTED', 'findNotes returned invalid note ids.');
-    }
-    if (ids.length === 0) {
-      return { kind: 'none' };
-    }
-    const infos = await this.ankiClient.notesInfo(ids, { signal });
-    if (!Array.isArray(infos) || infos.length !== ids.length) {
-      throw new ContractError('API_UNSUPPORTED', 'notesInfo did not return every requested note.');
-    }
-    const matches = [];
-    for (const info of infos) {
-      const fields = readNoteFields(info);
-      if (info.modelName !== (capture.destination.modelName || MODEL_NAME)) {
-        throw new ContractError('MODEL_INCOMPATIBLE', 'The matching Anki note uses an incompatible note type.');
-      }
-      if (fields.CaptureId !== capture.captureId) {
-        return { kind: 'conflict', code: 'IDENTITY_MISMATCH' };
-      }
-      matches.push({ noteId: info.noteId, fields });
-    }
-    if (matches.length !== 1) {
-      return { kind: 'conflict', code: 'MULTIPLE_MATCHES', count: matches.length };
-    }
-    return { kind: 'one', ...matches[0] };
+  #locate(capture, signal) {
+    return locateCaptureNote(this.ankiClient, capture, signal);
   }
 
   async #recoverPending(job, token, capture, located) {
@@ -522,6 +535,8 @@ module.exports = {
   SyncService,
   defaultOperationId,
   fieldsEqual,
+  locateCaptureNote,
   publicSyncError,
   readNoteFields,
+  verifyDestination,
 };

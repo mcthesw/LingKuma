@@ -3,9 +3,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { indexedDB } = require('fake-indexeddb');
+const { AssociationStore } = require('../../../src/anki/association-store');
 const { CaptureService } = require('../../../src/anki/capture-service');
 const { ManagementService } = require('../../../src/anki/management-service');
 const { ManagementStore } = require('../../../src/anki/management-store');
+const { ReconciliationService } = require('../../../src/anki/reconciliation-service');
 const { openAnkiRepository } = require('../../../src/anki/repository');
 const { SyncService } = require('../../../src/anki/sync-service');
 const { FakeAnki } = require('../support/fake-anki');
@@ -31,9 +33,16 @@ async function fixture() {
   const repository = await openAnkiRepository({ indexedDB, name: `lingkuma-manager-${++sequence}`, now: () => ++clock });
   const anki = new FakeAnki();
   const syncService = new SyncService({ repository, ankiClient: anki, createOperationId: () => `op-${clock}`, now: () => clock });
+  const reconciliationService = new ReconciliationService({
+    repository,
+    associationStore: new AssociationStore(repository),
+    ankiClient: anki,
+    now: () => clock,
+  });
   const captureService = new CaptureService({ repository });
   const management = new ManagementService({
-    repository, managementStore: new ManagementStore(repository), captureService, syncService, ankiClient: anki,
+    repository, managementStore: new ManagementStore(repository), captureService,
+    syncService, reconciliationService, ankiClient: anki,
   });
   async function drainPush(owner = `push-${clock}`) {
     const job = await repository.claimDueJob('push', clock + 10, owner, 30_000);
@@ -97,8 +106,9 @@ test('conflict view exposes both versions and resolution rechecks Anki before ap
   let capture = await f.repository.getCapture(created.capture.captureId);
   const note = f.anki.notes.get(capture.link.noteIdHint);
   note.fields.Meaning = 'remote edit';
-  await f.management.edit({ captureId: capture.captureId, expectedRevision: capture.contentRevision, patch: { meaning: 'local edit' } });
-  assert.equal((await f.drainPush('conflict')).status, 'conflict');
+  const edited = await f.management.edit({ captureId: capture.captureId, expectedRevision: capture.contentRevision, patch: { meaning: 'local edit' } });
+  assert.equal(edited.status, 'conflict');
+  assert.equal(await f.drainPush('conflict'), null);
 
   const listed = await f.management.list({ state: 'conflict' });
   assert.equal(listed.items.length, 1);
@@ -109,8 +119,9 @@ test('conflict view exposes both versions and resolution rechecks Anki before ap
   assert.equal(note.fields.Meaning, 'remote edit');
 
   note.fields.Meaning = 'changed again';
-  await f.management.edit({ captureId: capture.captureId, expectedRevision: resolved.contentRevision, patch: { meaning: 'another local edit' } });
-  assert.equal((await f.drainPush('second-conflict')).status, 'conflict');
+  const editedAgain = await f.management.edit({ captureId: capture.captureId, expectedRevision: resolved.contentRevision, patch: { meaning: 'another local edit' } });
+  assert.equal(editedAgain.status, 'conflict');
+  assert.equal(await f.drainPush('second-conflict'), null);
   capture = await f.repository.getCapture(capture.captureId);
   note.fields.Meaning = 'changed after review';
   await assert.rejects(() => f.management.resolve({ captureId: capture.captureId, expectedRevision: capture.contentRevision, strategy: 'local', localFields: [] }), error => error.code === 'REMOTE_CHANGED');
@@ -124,14 +135,19 @@ test('multiple identity matches show a retryable error without writing either no
   let capture = await f.repository.getCapture(created.capture.captureId);
   const original = f.anki.notes.get(capture.link.noteIdHint);
   const duplicateId = f.anki.seedNote({ fields: original.fields });
-  await f.management.edit({
+  const edited = await f.management.edit({
     captureId: capture.captureId,
     expectedRevision: capture.contentRevision,
     patch: { userNote: 'must not write ambiguously' },
   });
-  assert.equal((await f.drainPush('multiple')).status, 'conflict');
+  assert.equal(edited.status, 'conflict');
+  assert.equal(await f.drainPush('multiple'), null);
   const item = (await f.management.list({ state: 'conflict' })).items[0];
   assert.equal(item.lastError.code, 'MULTIPLE_MATCHES');
+  await assert.rejects(
+    () => f.management.openInAnki({ captureId: capture.captureId }),
+    error => error.code === 'MULTIPLE_MATCHES',
+  );
   assert.equal(item.remoteFields, null);
   assert.equal(f.anki.countCalls('updateNoteFields'), 0);
 
@@ -161,8 +177,9 @@ test('missing note requires explicit recreate and linked note opening revalidate
   capture = await f.repository.getCapture(capture.captureId);
 
   f.anki.notes.delete(capture.link.noteIdHint);
-  await f.management.edit({ captureId: capture.captureId, expectedRevision: capture.contentRevision, patch: { userNote: 'changed' } });
-  assert.equal((await f.drainPush('missing')).status, 'remote_missing');
+  const editedMissing = await f.management.edit({ captureId: capture.captureId, expectedRevision: capture.contentRevision, patch: { userNote: 'changed' } });
+  assert.equal(editedMissing.status, 'remote_missing');
+  assert.equal(await f.drainPush('missing'), null);
   capture = await f.repository.getCapture(capture.captureId);
   assert.equal(capture.link.deliveryState, 'remote_missing');
   assert.equal(await f.drainPush('no-implicit-recreate'), null);
