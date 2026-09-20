@@ -31,6 +31,17 @@
       </select></label>
       <button type="submit">筛选</button>
     </form>
+    <section class="backup-panel" aria-labelledby="backup-heading">
+      <div>
+        <h2 id="backup-heading">本地备份</h2>
+        <p>导出或恢复 LingKuma 摘录。恢复不会直接覆盖已有记录。</p>
+      </div>
+      <label class="media-option"><input id="backup-media" type="checkbox"> 包含本地发音音频</label>
+      <button id="backup-export" type="button">导出</button>
+      <label class="file-button">选择备份<input id="backup-file" type="file" accept="application/json,.json"></label>
+      <button id="backup-import" type="button" disabled>恢复</button>
+      <span id="backup-status" role="status" aria-live="polite"></span>
+    </section>
     <div id="status" role="status" aria-live="polite"></div>
     <div id="records"></div>
     <button id="more" type="button" hidden>加载更多</button>

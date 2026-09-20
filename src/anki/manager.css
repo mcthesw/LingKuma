@@ -17,6 +17,15 @@ button { padding: 8px 13px; border: 1px solid var(--line); border-radius: 7px; b
 button.primary { background: var(--accent); color: white; border-color: var(--accent); }
 button.danger { color: #b42318; }
 #status { min-height: 32px; padding: 10px 2px 4px; color: var(--muted); }
+.backup-panel { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding: 13px 16px; border: 1px solid var(--line); border-radius: 12px; }
+.backup-panel > div { margin-right: auto; }
+.backup-panel h2, .backup-panel p { margin: 0; }
+.backup-panel h2 { font-size: 1rem; }
+.backup-panel p, #backup-status { color: var(--muted); font-size: .85rem; }
+.media-option { display: flex; grid-template-columns: auto 1fr; align-items: center; }
+.media-option input { width: auto; }
+.file-button { display: inline-block; padding: 8px 13px; border: 1px solid var(--line); border-radius: 7px; cursor: pointer; }
+.file-button input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
 .term-group { margin: 18px 0 26px; }
 .term-group > h2 { font-size: 1.15rem; margin-bottom: 8px; }
 .record { padding: 16px; border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; }

@@ -259,6 +259,18 @@
 提交：本任务提交。
 下一任务：T18，实现安全备份与恢复。
 
+### T18
+
+实际基线：本地IndexedDB已持久化摘录、任务、媒体和设置，但没有版本化导出、导入校验或管理页入口；直接复制数据库会同时带走凭证、活动lease和可重放pendingWrite，也无法安全合并已有较新内容。
+修改文件：`src/anki/backup-service.js`、`src/anki/backup-store.js`、`src/anki/media-service.js`、`src/anki/association-store.js`、`src/anki/reconciliation-service.js`、`src/anki/background-runtime.js`、`src/anki/manager.html`、`src/anki/manager.css`、`src/anki/manager.js`、`tests/anki/integration/backup.test.js`、本记录。
+行为变化：新增本地专用、版本化JSON备份，导出冻结原始证据、当前材料、人工字段来源和最小关联基线；不读取meta/jobs，不包含key、endpoint、活动lease、requestId、noteIdHint、lastVerifiedAt或pendingWrite。可选音频仅导出被摘录引用、≤5 MiB且受支持的内容哈希文件，不信任旧Anki媒体名。导入同时限制16 MiB/50000条，严格校验结构、字段长度、稳定身份重算、CaptureId/基线一致性、媒体头和SHA-256；全部校验完成后再在单个captures/jobs/media事务合并。已有capture永不覆盖：材料相同计重复，不同计冲突；新关联清除noteId和核实时间并先排inspect，旧本地差异核实后进入双方可见冲突，不自动写Anki。远端已删除则标missing且不复活。可选媒体在关联核实后从已校验本地字节重新上传，再走既有安全push协调。结果返回恢复、重复、冲突、拒绝和媒体恢复计数。
+测试命令：`node --test tests/anki/integration/backup.test.js tests/anki/integration/reconciliation.test.js`；`npm run test:anki`；`browser-use`加载最终`dist/src/anki/manager.html`，使用受控后台执行导出和文件导入交互。
+实际结果：targeted 7/7通过，其中T18 A44-A46为4/4；全套unit 67/67、integration 64/64、e2e 1/1通过，构建仅有既有包体积警告。A44导出文本无secret、lease、pendingWrite或opId，恢复材料可读且旧noteId/核实时间为空，关联先核对，本地未确认差异转冲突且零update；可选WAV经哈希恢复并在核实后上传一次，未调用提供方且未信任旧文件名。A45旧备份对较新本地内容返回冲突且内容不变，Anki已删除时只标missing、addNote为0。A46坏版本、17 MiB输入和篡改CaptureId均在事务前拒绝，目标库保持0条。最终页面显示简洁备份区；导出反馈1条且生成日期文件名，导入反馈恢复2/重复1/冲突1/拒绝0。
+未运行的验收：浏览器下载点击被拦截并核对生成文件名，未向用户下载目录写测试文件；文件内容和恢复由真实Blob/File页面路径及真实IndexedDB集成测试分别覆盖。未在用户真实Anki上传恢复媒体，使用FakeAnki验证上传和零误建；Firefox仍未安装。
+回归检查：导入不删库、不重建库、不写meta设置，不读取或上传云端；任何记录/媒体校验失败均在写事务前终止。恢复任务均为重新生成的无lease任务，绝不恢复旧pendingWrite；同ID已有记录不会因备份时间戳或旧synced状态被覆盖。关联、媒体和内容写入继续经过既有巡检、差异保护及串行调度。
+提交：本任务提交。
+下一任务：T19，收紧安全边界并完成隐私回归。
+
 ## 最终真实环境验收
 
 Anki版本 / Connect协议与能力：

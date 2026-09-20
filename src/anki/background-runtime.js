@@ -2,6 +2,8 @@
 
 const { AnkiConnectClient } = require('./anki-client');
 const { AssociationStore } = require('./association-store');
+const { BackupService } = require('./backup-service');
+const { BackupStore } = require('./backup-store');
 const { createSupertoneAudioProvider } = require('./audio-provider');
 const { CaptureService } = require('./capture-service');
 const { ContractError } = require('./contracts');
@@ -152,6 +154,7 @@ function initializeAnkiBackground({
       ankiClient,
       notifyCaptureChanged: captureNotifier.notify,
     });
+    const backupService = new BackupService({ backupStore: new BackupStore(repository) });
     const scheduler = new JobScheduler({
       repository,
       enrichmentCoordinator,
@@ -172,6 +175,7 @@ function initializeAnkiBackground({
       captureService,
       syncService,
       reconciliationService,
+      backupService,
       ankiClient,
       scheduleDrain: reason => scheduler.scheduleDrain(reason),
     });
@@ -203,6 +207,13 @@ function initializeAnkiBackground({
       const captureId = captureIdPayload(payload);
       const result = await (await services).captureService.get(captureId);
       if (result) captureNotifier.track(captureId, context.sender);
+      return result;
+    }),
+    'backup.export': trusted(async payload => (await services).backupService.export(payload || {})),
+    'backup.import': trusted(async payload => {
+      const state = await services;
+      const result = await state.backupService.import(payload || {});
+      void state.scheduler.scheduleDrain('backup_imported').catch(() => {});
       return result;
     }),
     'capture.list': trusted(async payload => (await services).managementService.list(payload || {})),

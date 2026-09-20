@@ -66,6 +66,24 @@ class MediaService {
         await this.repository.rescheduleJob(token, { nextAttemptAt: this.now() + 1_000, incrementAttempt: false });
         return { status: 'waiting_text' };
       }
+      const restoredMedia = capture.mediaHash ? await this.mediaStore.get(capture.mediaHash) : null;
+      if (restoredMedia) {
+        const inputKey = `restored:${restoredMedia.hash}`;
+        if (!await this.mediaStore.setClaimedInputKey(token, inputKey)) return { status: 'stale' };
+        let uploaded = restoredMedia;
+        if (!uploaded.ankiMediaFilename) {
+          await this.ankiClient.getProfileStatus(capture.destination?.expectedProfile || null, { signal });
+          const actual = await this.ankiClient.storeMediaFile(uploaded.filename, base64(uploaded.bytes), { signal });
+          if (typeof actual !== 'string' || !/^[A-Za-z0-9_.-]+$/.test(actual)) {
+            throw new ContractError('AUDIO_FAILED', 'AnkiConnect returned an invalid media filename.');
+          }
+          uploaded = await this.mediaStore.put({ ...uploaded, ankiMediaFilename: actual });
+        }
+        const finalized = await this.mediaStore.finalize(token, inputKey, uploaded);
+        if (!finalized) return { status: 'stale' };
+        this.#notify(finalized);
+        return { status: 'committed', capture: toPublicCaptureDto(finalized) };
+      }
       const descriptor = await this.audioProvider.describe(capture);
       if (!descriptor) return this.#terminal(token, 'unavailable', mediaError(new ContractError('AUDIO_UNAVAILABLE', 'The selected word pronunciation channel cannot export audio.', { retryable: false })));
       if (!await this.mediaStore.setClaimedInputKey(token, descriptor.inputKey)) return { status: 'stale' };

@@ -212,6 +212,37 @@ async function handleEdit(event) {
     setStatus(`${error.code || 'ERROR'}：${error.message}`, true);
   }
 }
+async function exportBackup() {
+  elements.backupStatus.textContent = '正在导出…';
+  try {
+    const backup = await request('backup.export', { includeMedia: elements.backupMedia.checked });
+    const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `lingkuma-anki-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    elements.backupStatus.textContent = `已导出 ${backup.captures.length} 条摘录。`;
+  } catch (error) {
+    elements.backupStatus.textContent = `${error.code || 'ERROR'}：${error.message}`;
+  }
+}
+
+async function importBackup() {
+  const file = elements.backupFile.files[0];
+  if (!file) return;
+  elements.backupStatus.textContent = '正在校验并恢复…';
+  try {
+    if (file.size > 16 * 1024 * 1024) throw new Error('备份文件超过 16 MiB。');
+    const backup = JSON.parse(await file.text());
+    const result = await request('backup.import', { backup });
+    elements.backupStatus.textContent = `已恢复 ${result.restored} 条，重复 ${result.duplicate} 条，冲突 ${result.conflict} 条，拒绝 ${result.rejected} 条。`;
+    await load(true);
+  } catch (error) {
+    elements.backupStatus.textContent = `${error.code || 'ERROR'}：${error.message}`;
+  }
+}
+
 
 function initialize() {
   Object.assign(elements, {
@@ -219,11 +250,19 @@ function initialize() {
     state: document.getElementById('state'), status: document.getElementById('status'),
     records: document.getElementById('records'), more: document.getElementById('more'),
     template: document.getElementById('record-template'),
+    backupMedia: document.getElementById('backup-media'),
+    backupExport: document.getElementById('backup-export'),
+    backupFile: document.getElementById('backup-file'),
+    backupImport: document.getElementById('backup-import'),
+    backupStatus: document.getElementById('backup-status'),
   });
   elements.filters.addEventListener('submit', event => { event.preventDefault(); void load(true); });
   elements.more.addEventListener('click', () => void load(false));
   elements.records.addEventListener('click', event => void handleAction(event));
   elements.records.addEventListener('submit', event => void handleEdit(event));
+  elements.backupExport.addEventListener('click', () => void exportBackup());
+  elements.backupFile.addEventListener('change', () => { elements.backupImport.disabled = !elements.backupFile.files.length; });
+  elements.backupImport.addEventListener('click', () => void importBackup());
   void load(true);
 }
 

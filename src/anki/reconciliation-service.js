@@ -81,7 +81,7 @@ class ReconciliationService {
           error: { code: 'REMOTE_CHANGED', message: 'The Anki note changed outside LingKuma.', retryable: false },
         };
       } else {
-        outcome = { kind: 'verified', noteId: located.noteId };
+        outcome = { kind: 'verified', noteId: located.noteId, fields: located.fields };
       }
       const updated = await this.associationStore.commitInspection(
         token,

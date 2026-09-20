@@ -99,12 +99,19 @@ class AssociationStore {
       }
 
       if (outcome.kind === 'verified') {
+        const restoredDifference = capture.link.lastError?.code === 'RESTORE_REVIEW_REQUIRED'
+          && (capture.dirtyFields || []).length > 0;
         capture.link.noteIdHint = outcome.noteId;
         capture.link.lastVerifiedAt = this.repository.now();
-        capture.link.lastError = null;
-        capture.link.observedRemoteFields = null;
-        if (['conflict', 'remote_missing'].includes(capture.link.deliveryState)) {
-          capture.link.deliveryState = (capture.dirtyFields || []).length > 0 ? 'pending' : 'synced';
+        if (restoredDifference) {
+          capture.link.deliveryState = 'conflict';
+          capture.link.observedRemoteFields = clone(outcome.fields);
+        } else {
+          capture.link.lastError = null;
+          capture.link.observedRemoteFields = null;
+          if (['pending', 'conflict', 'remote_missing'].includes(capture.link.deliveryState)) {
+            capture.link.deliveryState = (capture.dirtyFields || []).length > 0 ? 'pending' : 'synced';
+          }
         }
       } else if (outcome.kind === 'missing') {
         capture.link.deliveryState = 'remote_missing';
