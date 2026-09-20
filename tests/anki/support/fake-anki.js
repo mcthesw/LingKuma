@@ -118,6 +118,10 @@ class FakeAnki {
     return filename;
   }
 
+  async guiBrowseNote(noteId) {
+    this.calls.push({ action: 'guiBrowse', noteId });
+    return [noteId];
+  }
   seedNote(note) {
     const noteId = note.noteId || this.nextNoteId++;
     this.notes.set(noteId, {

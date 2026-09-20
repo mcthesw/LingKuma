@@ -6,6 +6,8 @@ const { CaptureService } = require('./capture-service');
 const { ContractError } = require('./contracts');
 const { EnrichmentCoordinator } = require('./enrichment');
 const { MediaService } = require('./media-service');
+const { ManagementService } = require('./management-service');
+const { ManagementStore } = require('./management-store');
 const { MediaStore } = require('./media-store');
 const { createProviderAdapter } = require('./provider-adapter');
 const { openAnkiRepository } = require('./repository');
@@ -155,10 +157,19 @@ function initializeAnkiBackground({
       scheduleDrain: reason => scheduler.scheduleDrain(reason),
       notifyCaptureChanged: captureNotifier.notify,
     });
+    const managementService = new ManagementService({
+      repository,
+      managementStore: new ManagementStore(repository),
+      captureService,
+      syncService,
+      ankiClient,
+      scheduleDrain: reason => scheduler.scheduleDrain(reason),
+    });
     return {
       captureService,
       repository,
       scheduler,
+      managementService,
       settingsService,
     };
   })();
@@ -184,6 +195,14 @@ function initializeAnkiBackground({
       if (result) captureNotifier.track(captureId, context.sender);
       return result;
     }),
+    'capture.list': trusted(async payload => (await services).managementService.list(payload || {})),
+    'capture.edit': trusted(async payload => (await services).managementService.edit(payload || {})),
+    'capture.regenerate': trusted(async payload => (await services).managementService.regenerate(payload || {})),
+    'capture.retry': trusted(async payload => (await services).managementService.retry(payload || {})),
+    'capture.exclude': trusted(async payload => (await services).managementService.exclude(payload || {})),
+    'capture.resume': trusted(async payload => (await services).managementService.resume(payload || {})),
+    'capture.resolve': trusted(async payload => (await services).managementService.resolve(payload || {})),
+    'capture.openInAnki': trusted(async payload => (await services).managementService.openInAnki(payload || {})),
     'settings.getPublic': trusted(async () => {
       const state = await services;
       void schedulerRuntime.onManagementOpened().catch(() => {});

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LingKuma Anki 摘录</title>
+  <link rel="stylesheet" href="manager.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Anki 摘录</h1>
+      <p>查找、编辑和处理需要关注的摘录。</p>
+    </div>
+    <a href="../options/options.html#anki">Anki 设置</a>
+  </header>
+  <main>
+    <form id="filters" class="filters" role="search">
+      <label><span>搜索</span><input id="query" type="search" maxlength="256" placeholder="词语、原句、释义或来源"></label>
+      <label><span>状态</span><select id="state">
+        <option value="">全部</option>
+        <option value="synced">已同步</option>
+        <option value="waiting_content">等待释义</option>
+        <option value="content_failed">释义失败</option>
+        <option value="waiting_setup">等待设置</option>
+        <option value="waiting_anki">等待 Anki</option>
+        <option value="conflict">需要处理</option>
+        <option value="remote_missing">Anki 笔记不存在</option>
+        <option value="blocked">已阻止</option>
+        <option value="excluded">已停止管理</option>
+      </select></label>
+      <button type="submit">筛选</button>
+    </form>
+    <div id="status" role="status" aria-live="polite"></div>
+    <div id="records"></div>
+    <button id="more" type="button" hidden>加载更多</button>
+  </main>
+  <template id="record-template">
+    <article class="record">
+      <div class="record-heading"><div><h2></h2><span class="badge"></span></div><time></time></div>
+      <p class="context"></p>
+      <p class="meaning"></p>
+      <p class="source"></p>
+      <p class="meta"></p>
+      <div class="error" hidden></div>
+      <div class="actions"></div>
+      <form class="edit-form" hidden>
+        <label>释义<textarea name="meaning" required></textarea></label>
+        <label>读音<input name="reading"></label>
+        <label>句子翻译<textarea name="sentenceTranslation"></textarea></label>
+        <label>用法<textarea name="usage"></textarea></label>
+        <label>个人笔记<textarea name="userNote"></textarea></label>
+        <div><button type="submit">保存</button><button type="button" data-action="cancel-edit">取消</button></div>
+      </form>
+      <div class="conflict" hidden></div>
+    </article>
+  </template>
+</body>
+</html>

@@ -30,6 +30,7 @@ function elements() {
     enabled: document.getElementById('ankiAutoCapture'),
     test: document.getElementById('ankiTestConnection'),
     save: document.getElementById('ankiSaveSettings'),
+    manager: document.getElementById('ankiOpenManager'),
     status: document.getElementById('ankiSetupStatus'),
     profile: document.getElementById('ankiProfileStatus'),
     confirmation: document.getElementById('ankiSingleProfileConfirmation'),
@@ -158,6 +159,9 @@ function initAnkiSettings() {
   });
   ui.test.addEventListener('click', () => void testConnection(ui));
   ui.save.addEventListener('click', () => void saveSettings(ui));
+  ui.manager.addEventListener('click', () => {
+    void chrome.tabs.create({ url: chrome.runtime.getURL('src/anki/manager.html') });
+  });
   ui.enabled.addEventListener('change', () => void saveCapturePreference(ui));
 }
 

@@ -48,6 +48,7 @@ const legacyConfig = {
     options: [
       './src/options/options.js'
     ],
+    manager: './src/anki/manager.js',
     // webdav: [
     //   './src/options/webdav/webdav.js'
     // ],
@@ -158,6 +159,9 @@ const legacyConfig = {
       if(pathData.chunk.name === 'options'){
         return 'src/options/[name].js';
       }
+      if (pathData.chunk.name === 'manager') {
+        return 'src/anki/manager.js';
+      }
       if(pathData.chunk.name === 'sidebar'){
         return 'src/sidebar/[name].js';
       }
@@ -217,6 +221,7 @@ const legacyConfig = {
         //{ from: 'manifest-firefox-local.json', to: 'manifest.json' },
         { from: 'manifest.json', to: 'manifest.json' },
         { from: 'content.css', to: '' },
+        { from: 'src/anki/manager.css', to: 'src/anki/manager.css' },
         { from: 'src/options/epubSplitter/jszip.min.js', to: 'src/options/epubSplitter/jszip.min.js',info: { minimized: true }}, // 告诉webpack这已经是压缩文件，不要处理
         { from: 'src/options/epubSplitter/FileSaver.min.js', to: 'src/options/epubSplitter/FileSaver.min.js',info: { minimized: true } },// 告诉webpack这已经是压缩文件，不要处理
         { from: 'src/icons/**/*', to: 'src/icons/[name][ext]' ,info: { minimized: true }},
@@ -260,6 +265,11 @@ const legacyConfig = {
       template: './src/options/options.html',
       filename: 'src/options/options.html',
       chunks: ['options'],
+    }),
+    new HtmlWebpackPlugin({
+      template: './src/anki/manager.html',
+      filename: 'src/anki/manager.html',
+      chunks: ['manager'],
     }),
     new HtmlWebpackPlugin({
       template: './src/options/epubSplitter/epubSplitter.html',

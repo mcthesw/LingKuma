@@ -225,7 +225,6 @@ class AnkiRepository {
         || Object.keys(patch).some(key => !allowed.includes(key))) {
       throw new ContractError('INPUT_INVALID', 'Content patch contains unsupported fields.');
     }
-
     try {
       const transaction = this.database.transaction(['captures', 'jobs'], 'readwrite');
       const captures = transaction.objectStore('captures');
@@ -234,6 +233,7 @@ class AnkiRepository {
       if (!capture) {
         throw new ContractError('INPUT_INVALID', 'Capture does not exist.');
       }
+      if (!capture.active) throw new ContractError('INPUT_INVALID', 'Resume this capture before editing it.');
       if (capture.contentRevision !== expectedRevision) {
         throw new ContractError('STALE_REVISION', 'Capture was edited by another operation.', {
           details: { current: clone(capture) },

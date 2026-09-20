@@ -22,7 +22,7 @@
 | T13 | PASS | 本任务提交 | `npm run test:anki`：unit 60/60、integration 47/47、e2e 1/1；Chromium主动点击持久化且悬浮/发音/关闭不新增 | 隔离profile未配置Anki，真实最终写入留T20 |
 | T14 | PASS | 本任务提交 | `npm run test:anki`：unit 64/64、integration 47/47、e2e 1/1；Chromium最终短语一次保存，网页/EPUB/PDF/字幕/iframe真实选区均持久化 | 外部阅读器与真实Anki自动写入合并验收留T20 |
 | T15 | PASS | 本任务提交 | `npm run test:anki`：unit 67/67、integration 52/52、e2e 1/1；Supertone真实协议适配、内容哈希媒体、文字先写、上传中断复用及旧voice结果隔离通过 | 未消耗用户Supertone额度；真实Anki媒体播放留T20专用测试数据 |
-| T16 | TODO | — | — | — |
+| T16 | PASS | 本任务提交 | `npm run test:anki`：unit 67/67、integration 57/57、e2e 1/1；管理搜索/分页/分组、编辑、冲突/缺失/多匹配、打开关联、停止/恢复通过；Chromium验证最终管理页 | 真实Anki上的管理全链留T20；浏览器UI使用受控后台DTO，未修改用户数据 |
 | T17 | TODO | — | — | — |
 | T18 | TODO | — | — | — |
 | T19 | TODO | — | — | — |
@@ -234,6 +234,18 @@
 回归检查：文本add/update/冲突仍只经SyncService；音频失败场景link保持synced且addNote仍为一次；不截视频、不生成整句、不录系统音频、不删除远端孤儿媒体；生产background已装配同一持久调度器。
 提交：本任务提交。
 下一任务：T16，实现摘录管理、编辑、停止/恢复及异常处理。
+
+### T16
+
+实际基线：后台已有单条编辑、再生成、排除/恢复及冲突/缺失协调方法，但没有可信管理路由、分页搜索、管理DTO或页面；异常只能留在存储状态中，用户无法查看和处理。
+修改文件：`src/anki/capture-status.js`、`src/anki/management-store.js`、`src/anki/management-service.js`、`src/anki/manager.html`、`src/anki/manager.css`、`src/anki/manager.js`、`src/anki/background-runtime.js`、`src/anki/capture-service.js`、`src/anki/repository.js`、`src/anki/settings-ui.js`、`src/options/options.html`、`webpack.config.js`、`tests/anki/support/fake-anki.js`、`tests/anki/integration/management-service.test.js`、本记录。
+行为变化：新增独立轻量管理页及设置入口，支持跨全部本地记录的关键词搜索、状态筛选、稳定游标分页和按词归组；展示冻结原句、释义、来源、更新时间、最后核实时间和独立音频状态。可信管理命令使用expectedRevision编辑释义/读音/翻译/用法/个人笔记并经既有push原地更新；停止管理后的记录拒绝编辑。冲突页以纯文本并排显示本地/Anki字段，可保留Anki、使用本地或选择本地字段，处理时仍由SyncService重新读取远端。缺失记录只在“显式重建”后恢复创建；多CaptureId匹配显示具体错误，用户修复Anki后可重试。打开关联笔记前重新核对profile、CaptureId、model和唯一性。停止管理删除本地任务但保留身份与远端笔记，再次相同查询只返回excluded；只有显式恢复才重新管理。
+测试命令：`node --test tests/anki/integration/management-service.test.js`；`npm run build`；`npm run test:anki`；Chromium加载最终`dist/src/anki/manager.html`并用受控安全DTO执行搜索和编辑交互。
+实际结果：targeted 5/5通过；全套unit 67/67、integration 57/57、e2e 1/1通过。35条记录两页无重复，词语分组/全文搜索正确；编辑只更新原capture且STALE_REVISION拒绝旧表单；正常编辑原note且addNote不增加；冲突双方展示、远端二次变化拒绝、多匹配零写入；缺失不隐式重建，显式动作后只创建一次；排除不删Anki、不复活，恢复显式。Chromium最终页面展示同词两语境、冲突对照和missing操作，搜索缩至1条，编辑个人笔记后重开值保持；页面未产生capture。
+未运行的验收：浏览器验收使用最终构建UI和受控后台DTO，后端命令由真实IndexedDB/FakeAnki集成测试覆盖；未在用户真实Anki上打开、修改或重建笔记，完整真实管理链留T20专用测试记录。Firefox仍未安装。
+回归检查：管理路由继续要求extension id和`manager.html`/options可信路径；内容脚本没有列表、任意noteId或Anki action权限。管理页面所有网页/AI/远端值只经`textContent`显示；普通查词入口未改，打开历史/搜索/编辑不调用capture lookup。
+提交：本任务提交。
+下一任务：T17，实现关联重绑定与本机外部变更巡检。
 
 ## 最终真实环境验收
 
