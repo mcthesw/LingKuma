@@ -2,6 +2,16 @@
 
 const { ContractError } = require('./contracts');
 const { createCaptureIdentity, createTermKey } = require('./identity');
+const {
+  clone,
+  requestResult,
+  storageError,
+  transactionDone,
+} = require('./indexeddb-store');
+const {
+  requestRecreate: requestRecreateTransaction,
+  resolveRemoteDifference: resolveRemoteDifferenceTransaction,
+} = require('./reconciliation-store');
 
 const DATABASE_NAME = 'lingkuma-anki-v1';
 const DATABASE_VERSION = 1;
@@ -18,34 +28,6 @@ const CONTENT_TO_ANKI_FIELD = Object.freeze({
   source: 'Source',
 });
 
-function requestResult(request) {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('IndexedDB request failed.'));
-  });
-}
-
-function transactionDone(transaction) {
-  return new Promise((resolve, reject) => {
-    transaction.oncomplete = () => resolve();
-    transaction.onabort = () => reject(transaction.error || new Error('IndexedDB transaction aborted.'));
-    transaction.onerror = () => {};
-  });
-}
-
-function clone(value) {
-  return value === undefined ? undefined : structuredClone(value);
-}
-
-function storageError(error) {
-  if (error instanceof ContractError) {
-    return error;
-  }
-  return new ContractError('STORAGE_FAILED', 'Anki capture storage failed.', {
-    retryable: error?.name === 'QuotaExceededError' || error?.name === 'UnknownError',
-    details: { name: error?.name || 'Error' },
-  });
-}
 
 function initializeSchema(database, oldVersion) {
   if (oldVersion < 1) {
@@ -389,6 +371,7 @@ class AnkiRepository {
     opId,
     kind = 'update',
     jobToken = null,
+    submittedFields = Object.keys(intendedFields || {}),
   } = {}) {
     if (!opId || !['create', 'update'].includes(kind)) {
       throw new ContractError('INPUT_INVALID', 'Invalid pending write.');
@@ -414,6 +397,7 @@ class AnkiRepository {
         sentRevision,
         intendedFields: clone(intendedFields),
         previousBase: clone(previousBase),
+        submittedFields: [...submittedFields],
       };
       capture.updatedAt = this.now();
       store.put(capture);
@@ -424,7 +408,7 @@ class AnkiRepository {
     }
   }
 
-  async confirmWrite(opId, observedFields, noteId) {
+  async confirmWrite(opId, observedFields, noteId, currentRevision = null, currentIntendedFields = null) {
     try {
       const transaction = this.database.transaction('captures', 'readwrite');
       const store = transaction.objectStore('captures');
@@ -441,9 +425,16 @@ class AnkiRepository {
       capture.link.deliveryState = 'synced';
       capture.link.lastVerifiedAt = this.now();
       capture.link.lastError = null;
-      const submittedFields = Object.keys(pending.intendedFields || {});
+      capture.link.observedRemoteFields = null;
+      const submittedFields = pending.submittedFields || Object.keys(pending.intendedFields || {});
+      const currentIsKnown = currentRevision === null
+        ? capture.contentRevision === pending.sentRevision
+        : capture.contentRevision === currentRevision && currentIntendedFields;
       capture.dirtyFields = (capture.dirtyFields || []).filter(field =>
-        !submittedFields.includes(field) || observedFields[field] !== pending.intendedFields[field]);
+        !submittedFields.includes(field)
+          || observedFields[field] !== pending.intendedFields[field]
+          || !currentIsKnown
+          || (currentIntendedFields && currentIntendedFields[field] !== pending.intendedFields[field]));
       capture.updatedAt = this.now();
       store.put(capture);
       await transactionDone(transaction);
@@ -471,6 +462,26 @@ class AnkiRepository {
     } catch (error) {
       throw storageError(error);
     }
+  }
+
+  resolveRemoteDifference(captureId, expectedRevision, observedFields, noteId, localFields) {
+    return resolveRemoteDifferenceTransaction(this, createJob, {
+      captureId,
+      expectedRevision,
+      observedFields,
+      noteId,
+      localFields,
+    });
+  }
+
+  requestRecreate(captureId, expectedRevision) {
+    return requestRecreateTransaction(
+      this,
+      createJob,
+      Object.values(CONTENT_TO_ANKI_FIELD),
+      captureId,
+      expectedRevision,
+    );
   }
 
   async setDeliveryState(captureId, deliveryState, lastError = null) {

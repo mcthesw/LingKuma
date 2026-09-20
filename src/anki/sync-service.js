@@ -2,6 +2,7 @@
 
 const { ANKI_FIELD_NAMES, ContractError } = require('./contracts');
 const { toPublicCaptureDto } = require('./capture-service');
+const { isCaptureId } = require('./identity');
 const {
   MODEL_NAME,
   assertCompatibleModelFields,
@@ -48,6 +49,22 @@ function fieldsEqual(left, right) {
   return ANKI_FIELD_NAMES.every(name => left?.[name] === right?.[name]);
 }
 
+function buildDesiredFields(baseFields, renderedFields, dirtyFields) {
+  const desired = { ...baseFields };
+  for (const name of dirtyFields || []) {
+    if (ANKI_FIELD_NAMES.includes(name) && typeof renderedFields[name] === 'string') {
+      desired[name] = renderedFields[name];
+    }
+  }
+  return desired;
+}
+
+function changedFieldPatch(baseFields, desiredFields, fieldNames) {
+  return Object.fromEntries((fieldNames || [])
+    .filter(name => ANKI_FIELD_NAMES.includes(name) && baseFields[name] !== desiredFields[name])
+    .map(name => [name, desiredFields[name]]));
+}
+
 class SyncService {
   constructor({
     repository,
@@ -66,6 +83,82 @@ class SyncService {
     this.notifyCaptureChanged = notifyCaptureChanged;
     this.now = now;
     this.retryDelayMs = retryDelayMs;
+  }
+
+  async resolveConflict({
+    captureId,
+    expectedRevision,
+    strategy,
+    localFields = [],
+  } = {}, { signal } = {}) {
+    if (!isCaptureId(captureId) || !Number.isInteger(expectedRevision)
+        || !['remote', 'local', 'fields'].includes(strategy)
+        || !Array.isArray(localFields)) {
+      throw new ContractError('INPUT_INVALID', 'The conflict resolution request is invalid.');
+    }
+    const capture = await this.repository.getCapture(captureId);
+    if (!capture || capture.contentRevision !== expectedRevision
+        || capture.link.deliveryState !== 'conflict' || !capture.link.observedRemoteFields) {
+      throw new ContractError('STALE_REVISION', 'The conflict changed before it was resolved.');
+    }
+    await this.#verifyDestination(capture.destination, signal);
+    const located = await this.#locate(capture, signal);
+    if (located.kind === 'none') {
+      throw new ContractError('REMOTE_MISSING', 'The conflicting Anki note no longer exists.');
+    }
+    if (located.kind === 'conflict') {
+      throw new ContractError(located.code, 'The conflicting Anki identity is not unique.');
+    }
+    if (!fieldsEqual(located.fields, capture.link.observedRemoteFields)) {
+      await this.repository.recordRemoteDifference(captureId, located.fields);
+      throw new ContractError('REMOTE_CHANGED', 'The Anki note changed again. Review the latest version.');
+    }
+
+    const renderedFields = renderFields(capture);
+    let selectedFields;
+    if (strategy === 'remote') {
+      selectedFields = [];
+    } else if (strategy === 'local') {
+      selectedFields = ANKI_FIELD_NAMES.filter(name =>
+        name !== 'CaptureId' && renderedFields[name] !== located.fields[name]);
+    } else {
+      const unique = Array.from(new Set(localFields));
+      if (unique.some(name => !ANKI_FIELD_NAMES.includes(name) || name === 'CaptureId')) {
+        throw new ContractError('INPUT_INVALID', 'The selected conflict fields are invalid.');
+      }
+      selectedFields = unique.filter(name => renderedFields[name] !== located.fields[name]);
+    }
+    const resolved = await this.repository.resolveRemoteDifference(
+      captureId,
+      expectedRevision,
+      located.fields,
+      located.noteId,
+      selectedFields,
+    );
+    this.#notify(resolved);
+    return toPublicCaptureDto(resolved);
+  }
+
+  async recreateMissing({ captureId, expectedRevision } = {}, { signal } = {}) {
+    if (!isCaptureId(captureId) || !Number.isInteger(expectedRevision)) {
+      throw new ContractError('INPUT_INVALID', 'The recreate request is invalid.');
+    }
+    const capture = await this.repository.getCapture(captureId);
+    if (!capture || capture.contentRevision !== expectedRevision
+        || capture.link.deliveryState !== 'remote_missing') {
+      throw new ContractError('STALE_REVISION', 'The missing-note state changed before recreation.');
+    }
+    await this.#verifyDestination(capture.destination, signal);
+    const located = await this.#locate(capture, signal);
+    if (located.kind !== 'none') {
+      if (located.kind === 'one') {
+        await this.repository.recordRemoteDifference(captureId, located.fields);
+      }
+      throw new ContractError('REMOTE_CHANGED', 'An Anki note now exists. Review it before recreating.');
+    }
+    const recreated = await this.repository.requestRecreate(captureId, expectedRevision);
+    this.#notify(recreated);
+    return toPublicCaptureDto(recreated);
   }
 
   async processClaimedJob(job, { signal } = {}) {
@@ -110,27 +203,37 @@ class SyncService {
     }
 
     await this.#verifyDestination(capture.destination, signal);
-    const intendedFields = renderFields(capture);
+    const renderedFields = renderFields(capture);
     const located = await this.#locate(capture, signal);
-    const reconciled = await this.#reconcileLocated(job, token, capture, intendedFields, located);
-    if (reconciled) {
-      return reconciled;
+    if (located.kind === 'conflict') {
+      return this.#locatedConflict(job, token, located);
     }
-    if (capture.link.wasLinked) {
-      return this.#finishWithState(job, token, 'remote_missing', {
-        code: 'REMOTE_MISSING',
-        message: 'The linked Anki note no longer exists.',
-        retryable: false,
-      });
+    if (located.kind === 'none') {
+      if (capture.link.wasLinked) {
+        return this.#finishWithState(job, token, 'remote_missing', {
+          code: 'REMOTE_MISSING',
+          message: 'The linked Anki note no longer exists.',
+          retryable: false,
+        });
+      }
+      return this.#create(job, token, capture, renderedFields, signal);
     }
+    return this.#coordinateExisting(job, token, capture, renderedFields, located, signal);
+  }
 
+  async #create(job, token, capture, intendedFields, signal) {
     const opId = this.createOperationId();
     const pending = await this.repository.prepareWrite(
       capture.captureId,
       capture.contentRevision,
       intendedFields,
       null,
-      { opId, kind: 'create', jobToken: token },
+      {
+        opId,
+        kind: 'create',
+        jobToken: token,
+        submittedFields: capture.dirtyFields,
+      },
     );
     if (!pending) {
       return Object.freeze({ status: 'stale', captureId: capture.captureId });
@@ -142,8 +245,8 @@ class SyncService {
     } catch (writeError) {
       const recovery = await this.#locate(capture, signal);
       const current = await this.repository.getCapture(capture.captureId);
-      const recovered = await this.#reconcileLocated(job, token, current, intendedFields, recovery);
-      if (recovered) {
+      const recovered = await this.#recoverPending(job, token, current, recovery);
+      if (recovered && recovered.status !== 'not_applied') {
         return recovered;
       }
       throw writeError;
@@ -151,11 +254,120 @@ class SyncService {
 
     const verification = await this.#locate(capture, signal);
     const current = await this.repository.getCapture(capture.captureId);
-    const confirmed = await this.#reconcileLocated(job, token, current, intendedFields, verification);
-    if (confirmed) {
+    const confirmed = await this.#recoverPending(job, token, current, verification);
+    if (confirmed && confirmed.status !== 'not_applied') {
       return confirmed;
     }
     throw new ContractError('ANKI_UNREACHABLE', 'The created Anki note could not be verified.', { retryable: true });
+  }
+
+  async #coordinateExisting(job, token, capture, renderedFields, located, signal) {
+    const recovered = await this.#recoverPending(job, token, capture, located);
+    if (recovered && recovered.status !== 'not_applied') {
+      return recovered;
+    }
+
+    const baseFields = capture.link.baseFields;
+    if (!baseFields) {
+      if (!fieldsEqual(located.fields, renderedFields)) {
+        return this.#remoteConflict(job, token, located.fields,
+          'The existing Anki note differs from local content and has no verified baseline.');
+      }
+      const prepared = await this.repository.prepareWrite(
+        capture.captureId,
+        capture.contentRevision,
+        renderedFields,
+        null,
+        {
+          opId: this.createOperationId(),
+          kind: 'create',
+          jobToken: token,
+          submittedFields: capture.dirtyFields,
+        },
+      );
+      return prepared
+        ? this.#confirm(job, token, prepared.opId, located)
+        : Object.freeze({ status: 'stale', captureId: capture.captureId });
+    }
+
+    const dirtyFields = [...(capture.dirtyFields || [])];
+    const desiredFields = buildDesiredFields(baseFields, renderedFields, dirtyFields);
+    if (fieldsEqual(located.fields, desiredFields)) {
+      const prepared = await this.repository.prepareWrite(
+        capture.captureId,
+        capture.contentRevision,
+        desiredFields,
+        baseFields,
+        {
+          opId: this.createOperationId(),
+          kind: 'update',
+          jobToken: token,
+          submittedFields: dirtyFields,
+        },
+      );
+      return prepared
+        ? this.#confirm(job, token, prepared.opId, located)
+        : Object.freeze({ status: 'stale', captureId: capture.captureId });
+    }
+    if (!fieldsEqual(located.fields, baseFields)) {
+      return this.#remoteConflict(job, token, located.fields,
+        'The Anki note changed outside LingKuma.');
+    }
+
+    const updateFields = changedFieldPatch(baseFields, desiredFields, dirtyFields);
+    if (Object.keys(updateFields).length === 0) {
+      const prepared = await this.repository.prepareWrite(
+        capture.captureId,
+        capture.contentRevision,
+        desiredFields,
+        baseFields,
+        {
+          opId: this.createOperationId(),
+          kind: 'update',
+          jobToken: token,
+          submittedFields: dirtyFields,
+        },
+      );
+      return prepared
+        ? this.#confirm(job, token, prepared.opId, located)
+        : Object.freeze({ status: 'stale', captureId: capture.captureId });
+    }
+
+    const pending = await this.repository.prepareWrite(
+      capture.captureId,
+      capture.contentRevision,
+      desiredFields,
+      baseFields,
+      {
+        opId: this.createOperationId(),
+        kind: 'update',
+        jobToken: token,
+        submittedFields: dirtyFields,
+      },
+    );
+    if (!pending) {
+      return Object.freeze({ status: 'stale', captureId: capture.captureId });
+    }
+
+    try {
+      await this.ankiClient.updateNoteFields(located.noteId, updateFields, { signal });
+    } catch (writeError) {
+      const verification = await this.#locate(capture, signal);
+      const current = await this.repository.getCapture(capture.captureId);
+      const outcome = await this.#recoverPending(job, token, current, verification);
+      if (outcome && outcome.status !== 'not_applied') {
+        return outcome;
+      }
+      throw writeError;
+    }
+
+    const verification = await this.#locate(capture, signal);
+    const current = await this.repository.getCapture(capture.captureId);
+    const outcome = await this.#recoverPending(job, token, current, verification);
+    if (outcome && outcome.status !== 'not_applied') {
+      return outcome;
+    }
+    throw new ContractError('ANKI_UNREACHABLE', 'The updated Anki note could not be verified.', { retryable: true });
   }
 
   async #verifyDestination(destination, signal) {
@@ -195,49 +407,58 @@ class SyncService {
     return { kind: 'one', ...matches[0] };
   }
 
-  async #reconcileLocated(job, token, capture, intendedFields, located) {
+  async #recoverPending(job, token, capture, located) {
+    const pending = capture?.link?.pendingWrite;
+    if (!pending) {
+      return null;
+    }
     if (located.kind === 'none') {
       return null;
     }
     if (located.kind === 'conflict') {
-      return this.#finishWithState(job, token, 'conflict', {
-        code: located.code,
-        message: located.code === 'MULTIPLE_MATCHES'
-          ? 'Multiple Anki notes have the same capture identity.'
-          : 'Anki returned a note with a different capture identity.',
-        retryable: false,
-      });
+      return this.#locatedConflict(job, token, located);
     }
-
-    const pending = capture?.link?.pendingWrite;
-    if (pending?.kind === 'create' && fieldsEqual(located.fields, pending.intendedFields)) {
+    if (fieldsEqual(located.fields, pending.intendedFields)) {
       return this.#confirm(job, token, pending.opId, located);
     }
-    if (fieldsEqual(located.fields, intendedFields)) {
-      const opId = pending?.opId || this.createOperationId();
-      if (!pending) {
-        const prepared = await this.repository.prepareWrite(
-          capture.captureId,
-          capture.contentRevision,
-          intendedFields,
-          null,
-          { opId, kind: 'create', jobToken: token },
-        );
-        if (!prepared) {
-          return Object.freeze({ status: 'stale', captureId: capture.captureId });
-        }
-      }
-      return this.#confirm(job, token, opId, located);
+    if (pending.kind === 'update' && fieldsEqual(located.fields, pending.previousBase)) {
+      return Object.freeze({ status: 'not_applied', captureId: capture.captureId });
     }
+    return this.#remoteConflict(job, token, located.fields,
+      'The Anki note differs from both the pending write and its verified baseline.');
+  }
+
+  #locatedConflict(job, token, located) {
+    return this.#finishWithState(job, token, 'conflict', {
+      code: located.code,
+      message: located.code === 'MULTIPLE_MATCHES'
+        ? 'Multiple Anki notes have the same capture identity.'
+        : 'Anki returned a note with a different capture identity.',
+      retryable: false,
+    });
+  }
+
+  #remoteConflict(job, token, observedRemoteFields, message) {
     return this.#finishWithState(job, token, 'conflict', {
       code: 'REMOTE_CHANGED',
-      message: 'The matching Anki note differs from the pending local content.',
+      message,
       retryable: false,
-    }, located.fields);
+    }, observedRemoteFields);
   }
 
   async #confirm(job, token, opId, located) {
-    const capture = await this.repository.confirmWrite(opId, located.fields, located.noteId);
+    const beforeConfirmation = await this.repository.getCapture(job.captureId);
+    if (!beforeConfirmation) {
+      return Object.freeze({ status: 'stale', captureId: job.captureId });
+    }
+    const currentFields = renderFields(beforeConfirmation);
+    const capture = await this.repository.confirmWrite(
+      opId,
+      located.fields,
+      located.noteId,
+      beforeConfirmation.contentRevision,
+      currentFields,
+    );
     if (!capture) {
       return Object.freeze({ status: 'stale', captureId: job.captureId });
     }

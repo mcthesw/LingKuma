@@ -17,6 +17,7 @@ class FakeAnki {
     this.calls = [];
     this.nextNoteId = 1000;
     this.afterAdd = null;
+    this.afterUpdate = null;
   }
 
   async getProfileStatus(expectedProfile) {
@@ -81,11 +82,30 @@ class FakeAnki {
       modelName: note.modelName,
       fields: clone(note.fields),
       tags: [...note.tags],
+      review: {
+        cardId: noteId + 10_000,
+        due: 27,
+        interval: 12,
+        reps: 4,
+      },
     });
     if (this.afterAdd) {
       await this.afterAdd({ noteId, note: this.notes.get(noteId) });
     }
     return noteId;
+  }
+
+  async updateNoteFields(noteId, fields) {
+    this.calls.push({ action: 'updateNoteFields', noteId, fields: clone(fields) });
+    const note = this.notes.get(noteId);
+    if (!note) {
+      throw new ContractError('ANKI_API_ERROR', 'note not found');
+    }
+    Object.assign(note.fields, clone(fields));
+    if (this.afterUpdate) {
+      await this.afterUpdate({ noteId, note, fields: clone(fields) });
+    }
+    return null;
   }
 
   seedNote(note) {
@@ -96,6 +116,12 @@ class FakeAnki {
       modelName: note.modelName || this.modelName,
       fields: clone(note.fields),
       tags: [...(note.tags || ['lingkuma::lookup'])],
+      review: clone(note.review || {
+        cardId: noteId + 10_000,
+        due: 27,
+        interval: 12,
+        reps: 4,
+      }),
     });
     return noteId;
   }

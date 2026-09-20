@@ -16,7 +16,7 @@
 | T07 | PASS | 本任务提交 | `npm run test:anki`：结构化释义、注入边界、错误分类和Abort共53/53 unit通过 | 未调用真实AI，留T20 |
 | T08 | PASS | 本任务提交 | `npm run test:anki`：single-flight、乱序、重启、generation、编辑、有限重试及恢复共20/20 integration通过 | 调度/alarms并发预算留T11 |
 | T09 | PASS | 本任务提交 | `npm run test:anki`：创建、读回、未知结果、重启、重复错误、租约及冲突共30/30 integration通过 | 真实Anki写入留T20 |
-| T10 | TODO | — | — | — |
+| T10 | PASS | 本任务提交 | `npm run test:anki`：原地更新、三方差异、未确认恢复、并发编辑及显式重建共38/38 integration通过 | 真实Anki更新与卡片复习数据观测留T20 |
 | T11 | TODO | — | — | — |
 | T12 | TODO | — | — | — |
 | T13 | TODO | — | — | — |
@@ -162,6 +162,18 @@
 回归检查：构建成功且仅有原有体积警告；无meaning没有push；不同语境只按CaptureId区分；addNote每次协调尝试最多一次且读取可自动重试、写入不自动重试。
 提交：本任务提交。
 下一任务：T10，实现原地更新、三方差异和待确认写恢复。
+
+### T10
+
+实际基线：T09已可靠创建并保存baseFields/pendingWrite，但远端存在时仅能确认完全相等内容，尚无原地更新或差异处理。
+修改文件：`src/anki/sync-service.js`、`src/anki/repository.js`、`src/anki/indexeddb-store.js`、`src/anki/reconciliation-store.js`、`tests/anki/support/fake-anki.js`、`tests/anki/integration/sync-update.test.js`、本记录。
+行为变化：更新按base/本地dirty渲染补丁/remote三方决策，仅向updateNoteFields发送变化字段，写前持久化完整pendingWrite并在写后精确读回；恢复优先识别intended或previousBase，响应丢失不误报冲突。确认事务只清除本次提交且当前值仍相同的dirty字段，写入期间的新revision保留后续job。远端差异保留原始字段并暂停，采用远端、采用本地、字段选择均在重新读取远端后执行；采用远端富文本后仅改UserNote不会重写其他字段。删除和错误noteId提示不触发写入，只有显式recreate再次创建。
+测试命令：`npm run test:anki`。
+实际结果：unit 53/53、integration 38/38、e2e 1/1通过；原noteId字段更新、卡片review状态与标签不变、远端/本地/字段选择、远端二次变化、富文本基线、update响应丢失、写入未生效恢复、发送期间并发编辑、远端删除、noteId误指向及显式重建均通过。
+未运行的验收：本机AnkiConnect仍不可达，真实updateNoteFields后cardId/due/interval/reps观测留T20；当前FakeAnki按真实API边界证明只改note字段。
+回归检查：构建成功且仅有原有体积警告；add创建恢复、repository租约和原有53项unit均通过；无删除重建更新、无review接口、无标签清空、无远端默认覆盖。
+提交：本任务提交。
+下一任务：T11，实现持久后台调度、全局退避、alarm和worker恢复。
 
 ## 最终真实环境验收
 
