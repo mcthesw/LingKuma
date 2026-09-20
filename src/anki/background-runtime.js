@@ -47,6 +47,55 @@ function createLazyScheduler(servicePromise) {
     async settingsRepaired() { return (await servicePromise).scheduler.settingsRepaired(); },
   };
 }
+function createCaptureNotifier(browserApi) {
+  const captures = new Map();
+  const slots = new Map();
+
+  function removeSlot(slot) {
+    const previous = slots.get(slot);
+    if (!previous) return;
+    slots.delete(slot);
+    const subscribers = captures.get(previous.captureId);
+    subscribers?.delete(slot);
+    if (subscribers?.size === 0) captures.delete(previous.captureId);
+  }
+
+  function track(captureId, sender) {
+    if (typeof captureId !== 'string' || !Number.isInteger(sender?.tab?.id)) return;
+    const frameId = Number.isInteger(sender.frameId) ? sender.frameId : 0;
+    const slot = `${sender.tab.id}:${frameId}`;
+    removeSlot(slot);
+    const target = { captureId, tabId: sender.tab.id, frameId };
+    slots.set(slot, target);
+    if (!captures.has(captureId)) captures.set(captureId, new Map());
+    captures.get(captureId).set(slot, target);
+  }
+
+  function notify(capture) {
+    const subscribers = captures.get(capture?.captureId);
+    if (!subscribers) return;
+    const message = {
+      namespace: 'lingkuma.anki.v1',
+      type: 'capture.changed',
+      payload: capture,
+    };
+    for (const [slot, target] of [...subscribers]) {
+      try {
+        const delivery = browserApi.tabs.sendMessage(
+          target.tabId,
+          message,
+          { frameId: target.frameId },
+        );
+        if (delivery?.catch) delivery.catch(() => removeSlot(slot));
+      } catch (_) {
+        removeSlot(slot);
+      }
+    }
+  }
+
+  return Object.freeze({ notify, track });
+}
+
 
 function initializeAnkiBackground({
   browserApi,
@@ -60,6 +109,7 @@ function initializeAnkiBackground({
     throw new TypeError('Browser runtime and provider request transport are required.');
   }
 
+  const captureNotifier = createCaptureNotifier(browserApi);
   const services = (async () => {
     const repository = await openAnkiRepository({ indexedDB });
     const settingsService = new AnkiSettingsService({
@@ -72,8 +122,13 @@ function initializeAnkiBackground({
       repository,
       provider,
       getMeaningLanguage: () => settingsService.getMeaningLanguage(),
+      notifyCaptureChanged: captureNotifier.notify,
     });
-    const syncService = new SyncService({ repository, ankiClient });
+    const syncService = new SyncService({
+      repository,
+      ankiClient,
+      notifyCaptureChanged: captureNotifier.notify,
+    });
     const scheduler = new JobScheduler({
       repository,
       enrichmentCoordinator,
@@ -82,8 +137,9 @@ function initializeAnkiBackground({
     });
     const captureService = new CaptureService({
       repository,
-      getCaptureDefaults: () => settingsService.getCaptureDefaults(),
+      getLookupPolicy: () => settingsService.getLookupPolicy(),
       scheduleDrain: reason => scheduler.scheduleDrain(reason),
+      notifyCaptureChanged: captureNotifier.notify,
     });
     return {
       captureService,
@@ -102,9 +158,18 @@ function initializeAnkiBackground({
   const content = handler => requireContentSender(handler, browserApi);
 
   runtime.registerHandlers({
-    'capture.lookup': content(async payload => (await services).captureService.lookup(payload)),
+    'capture.lookup': content(async (payload, context) => {
+      const result = await (await services).captureService.lookup(payload);
+      if (result.captureId) captureNotifier.track(result.captureId, context.sender);
+      return result;
+    }),
     'capture.get': content(async payload => (await services).captureService.get(captureIdPayload(payload))),
-    'capture.lookupState': content(async payload => (await services).captureService.get(captureIdPayload(payload))),
+    'capture.lookupState': content(async (payload, context) => {
+      const captureId = captureIdPayload(payload);
+      const result = await (await services).captureService.get(captureId);
+      if (result) captureNotifier.track(captureId, context.sender);
+      return result;
+    }),
     'settings.getPublic': trusted(async () => {
       const state = await services;
       void schedulerRuntime.onManagementOpened().catch(() => {});
@@ -129,6 +194,7 @@ function initializeAnkiBackground({
 module.exports = {
   captureIdPayload,
   createLazyScheduler,
+  createCaptureNotifier,
   initializeAnkiBackground,
   requireContentSender,
 };

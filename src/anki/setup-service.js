@@ -261,6 +261,18 @@ class AnkiSettingsService {
     };
   }
 
+  async getLookupPolicy() {
+    const settings = await this.getPrivate();
+    if (!settings?.configured) {
+      return { enabled: true, learningLanguage: null, defaults: {} };
+    }
+    return {
+      enabled: settings.autoCaptureEnabled,
+      learningLanguage: settings.learningLanguage,
+      defaults: await this.getCaptureDefaults(),
+    };
+  }
+
   async getMeaningLanguage() {
     return (await this.getPrivate())?.meaningLanguage || 'zh';
   }

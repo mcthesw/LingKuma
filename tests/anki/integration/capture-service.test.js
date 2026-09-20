@@ -22,7 +22,7 @@ function snapshot(sentence = 'The iterator yields each record.') {
   };
 }
 
-async function fixture(defaults = {}) {
+async function fixture(defaults = {}, policy = {}) {
   sequence += 1;
   let now = sequence * 1_000;
   const repository = await openAnkiRepository({
@@ -34,7 +34,12 @@ async function fixture(defaults = {}) {
   const notifications = [];
   const service = new CaptureService({
     repository,
-    getCaptureDefaults: async () => defaults,
+    getLookupPolicy: async () => ({
+      enabled: true,
+      learningLanguage: null,
+      defaults,
+      ...policy,
+    }),
     scheduleDrain: captureId => { drains.push(captureId); },
     notifyCaptureChanged: dto => { notifications.push(dto); },
   });
@@ -95,6 +100,46 @@ test('conflict, remote-missing and excluded captures reopen instead of bypassing
     assert.equal((await repository.listCaptures()).items.length, 1);
     repository.close();
   }
+});
+
+test('pause blocks only new captures while existing work remains addressable', async () => {
+  const active = await fixture({}, { learningLanguage: 'fr' });
+  const first = await active.service.lookup({
+    lookupSessionId: 'before-pause',
+    originSnapshot: snapshot(),
+  });
+  active.repository.close();
+
+  const repository = await openAnkiRepository({
+    indexedDB,
+    name: `capture-service-${sequence}`,
+    now: () => 50_000,
+  });
+  const service = new CaptureService({
+    repository,
+    getLookupPolicy: async () => ({
+      enabled: false,
+      learningLanguage: 'fr',
+      defaults: {},
+    }),
+  });
+  const existing = await service.lookup({
+    lookupSessionId: 'paused-existing',
+    originSnapshot: { ...snapshot(), language: 'de' },
+  });
+  const absent = await service.lookup({
+    lookupSessionId: 'paused-new',
+    originSnapshot: snapshot('This process yields useful information.'),
+  });
+
+  assert.equal(existing.captureId, first.captureId);
+  assert.equal(existing.persisted, true);
+  assert.equal(existing.paused, true);
+  assert.equal(absent.captureId, null);
+  assert.equal(absent.persisted, false);
+  assert.equal(absent.paused, true);
+  assert.equal((await repository.listCaptures()).items.length, 1);
+  repository.close();
 });
 
 test('edit, regenerate, exclude and resume preserve identity and enforce revisions', async () => {

@@ -138,7 +138,7 @@ class AnkiRepository {
     this.database.close();
   }
 
-  async createOrGetCapture(originSnapshot, defaults = {}) {
+  async createOrGetCapture(originSnapshot, defaults = {}, { createIfMissing = true } = {}) {
     const identity = await createCaptureIdentity(originSnapshot);
     const now = this.now();
     let transaction;
@@ -153,7 +153,7 @@ class AnkiRepository {
         capture.lastSeenAt = now;
         capture.updatedAt = Math.max(capture.updatedAt, now);
         captures.put(capture);
-      } else {
+      } else if (createIfMissing) {
         const content = defaultContent(identity.snapshot, defaults);
         const hasMeaning = typeof content.meaning === 'string' && content.meaning.trim().length > 0;
         capture = {
@@ -193,7 +193,7 @@ class AnkiRepository {
       }
 
       await transactionDone(transaction);
-      return { capture: clone(capture), created };
+      return { capture: capture ? clone(capture) : null, created };
     } catch (error) {
       if (transaction) {
         try {

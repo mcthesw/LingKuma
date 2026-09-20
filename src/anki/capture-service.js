@@ -69,7 +69,7 @@ function validateLookupInput(input) {
 class CaptureService {
   constructor({
     repository,
-    getCaptureDefaults = async () => ({}),
+    getLookupPolicy = async () => ({ enabled: true, learningLanguage: null, defaults: {} }),
     scheduleDrain = () => {},
     notifyCaptureChanged = () => {},
   } = {}) {
@@ -77,7 +77,7 @@ class CaptureService {
       throw new TypeError('repository is required.');
     }
     this.repository = repository;
-    this.getCaptureDefaults = getCaptureDefaults;
+    this.getLookupPolicy = getLookupPolicy;
     this.scheduleDrain = scheduleDrain;
     this.notifyCaptureChanged = notifyCaptureChanged;
   }
@@ -98,14 +98,32 @@ class CaptureService {
 
   async lookup(input) {
     const { lookupSessionId, originSnapshot } = validateLookupInput(input);
-    const defaults = await this.getCaptureDefaults();
-    const { capture, created } = await this.repository.createOrGetCapture(originSnapshot, defaults || {});
+    const policy = await this.getLookupPolicy();
+    const snapshot = policy?.learningLanguage
+      ? { ...originSnapshot, language: policy.learningLanguage }
+      : originSnapshot;
+    const { capture, created } = await this.repository.createOrGetCapture(
+      snapshot,
+      policy?.defaults || {},
+      { createIfMissing: policy?.enabled !== false },
+    );
+    if (!capture) {
+      return Object.freeze({
+        lookupSessionId,
+        captureId: null,
+        existing: false,
+        persisted: false,
+        paused: true,
+        capture: null,
+      });
+    }
     this.#schedule(capture);
     return Object.freeze({
       lookupSessionId,
       captureId: capture.captureId,
       existing: !created,
       persisted: true,
+      paused: policy?.enabled === false,
       capture: toPublicCaptureDto(capture),
     });
   }

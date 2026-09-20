@@ -19,7 +19,7 @@
 | T10 | PASS | 本任务提交 | `npm run test:anki`：原地更新、三方差异、未确认恢复、并发编辑及显式重建共38/38 integration通过 | 真实Anki更新与卡片复习数据观测留T20 |
 | T11 | PASS | 本任务提交 | `npm run test:anki`：alarm、过期lease、AI并发、百条离线队列、全局退避及配置修复共43/43 integration通过 | 浏览器真实休眠/唤醒链留T20 |
 | T12 | PASS | 本任务提交 | `npm run test:anki`：设置/凭证/绑定/profile/model/deck/可信路由共46/46 integration通过；Chromium真实连接AnkiConnect 6 | 未创建真实模型，写入验收留T20 |
-| T13 | TODO | — | — | — |
+| T13 | PASS | 本任务提交 | `npm run test:anki`：unit 60/60、integration 47/47、e2e 1/1；Chromium主动点击持久化且悬浮/发音/关闭不新增 | 隔离profile未配置Anki，真实最终写入留T20 |
 | T14 | TODO | — | — | — |
 | T15 | TODO | — | — | — |
 | T16 | TODO | — | — | — |
@@ -198,6 +198,18 @@
 回归检查：构建成功且仅有原有体积警告；content bundle仍为3.2 KiB；设置页经截图确认布局与未配置/连接成功状态，旧查词、创建、更新、调度测试全通过。
 提交：本任务提交。
 下一任务：T13，将主动单词查询语义入口接到capture.lookup，并显示不阻塞阅读的持久状态。
+
+### T13
+
+实际基线：主动单词查询只打开遗留tooltip并各自发起AI推荐，`capture.lookup`尚未接入语义入口；后台也没有按tab/frame把持久状态反向通知当前弹窗，设置中的暂停尚未约束新摘录。
+修改文件：`src/service/a4_tooltip_new.js`、`src/anki/content-adapter.js`、`src/anki/background-runtime.js`、`src/anki/capture-service.js`、`src/anki/setup-service.js`、`src/anki/repository.js`、`tests/anki/unit/content-adapter.test.js`、`tests/anki/unit/runtime.test.js`、`tests/anki/integration/capture-service.test.js`、本记录。
+行为变化：仅`handleA4PointerActivation`传入的主动查询意图触发摘录；悬浮、停留重绘、发音和关闭路径不触发。语义入口用真实sentence Range与word Range同步冻结原文、精确offset和页面来源，再由controller生成独立lookupSessionId。事务ACK后tooltip显示本地保存，持久任务释义替代该主动分支的两份遗留自动AI推荐，核实写入后显示已写入Anki；换词/关窗只释放UI订阅，不取消任务。后台按captureId与tab/frame跟踪当前订阅，enrich/sync通知安全DTO，失败frame自动清理；ACK后`lookupState`补偿注册前通知竞态。已配置且暂停时原查询照常、已有记录可重开，但原子禁止新记录；固定学习语言在生成身份前覆盖页面提示语言。
+测试命令：`node --test tests/anki/unit/content-adapter.test.js tests/anki/unit/runtime.test.js tests/anki/integration/capture-service.test.js tests/anki/integration/enrichment.test.js tests/anki/integration/sync-create.test.js tests/anki/e2e/message-bridge.test.js`；`npm run test:anki`；Chromium 150隔离profile加载最终构建和本地真实文章页。
+实际结果：targeted 31/31通过；全套unit 60/60、integration 47/47、e2e 1/1通过。跨节点offset、A/B乱序、关闭后迟到通知、去重、持久恢复、单provider调用、精确写后核实、tab/frame订阅替换和暂停策略均通过。Chromium中悬浮后capture数保持0；真实鼠标点击后新增1条，重复主动查询、播放和关闭后仍只有该身份一条；记录冻结`The iterator yields each record…`的`yields`为13..19。tooltip显示“本地已保存，待配置 Anki”和同一持久结果“记录”，遗留AI项为0，截图确认提示不阻塞正文。
+未运行的验收：隔离浏览器未完成Anki设置，因此A32的真实最终制卡与verified状态留T20专用测试牌组；本地烟测页的高亮词表为空，先在隔离world补入真实Range后再用真实鼠标事件验证入口，未把该限制伪装成完整自然文章高亮验收。短语/EPUB/PDF/字幕入口按依赖留T14。
+回归检查：构建成功且仅有原有体积警告；content bundle由3.2 KiB增至5.96 KiB；普通字典、词汇状态、TTS和手动深度分析路径未移除，非主动tooltip仍走原行为。
+提交：本任务提交。
+下一任务：T14，冻结短语最终选区并统一网页、EPUB、PDF与字幕来源适配。
 
 ## 最终真实环境验收
 

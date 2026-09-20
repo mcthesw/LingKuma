@@ -997,7 +997,73 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
 
 
 
-async function showEnhancedTooltipForWord(word, sentence, wordRect, parent, originalWord, isCustom = false) {
+function createA4AnkiCaptureIntent(hoveredDetail, sentenceRange) {
+  const facade = globalThis.LingKumaAnki;
+  if (!facade?.freezeWordOriginSnapshot || !hoveredDetail?.range || !sentenceRange) {
+    return { error: new Error('当前语境无法保存') };
+  }
+  try {
+    return {
+      snapshot: facade.freezeWordOriginSnapshot({
+        targetRange: hoveredDetail.range,
+        contextRange: sentenceRange,
+        language: document.documentElement.lang || navigator.language || 'en',
+        source: {
+          kind: 'web',
+          url: location.href,
+          title: document.title,
+        },
+      }),
+    };
+  } catch (error) {
+    return { error };
+  }
+}
+
+function renderA4AnkiLookupUpdate(targetTooltip, update) {
+  if (!targetTooltip || !update) return;
+  targetTooltip._ankiLookupUpdate = update;
+  const status = targetTooltip.querySelector('.anki-capture-status');
+  if (status) {
+    status.hidden = false;
+    status.textContent = update.text || '摘录状态暂不可用';
+    status.dataset.phase = update.phase || '';
+  }
+  const list = targetTooltip.querySelector('.scrollable-content .translation-list');
+  if (!list) return;
+  list.querySelectorAll('.ai-recommendation, .ai-recommendation-2').forEach(item => item.remove());
+  if (!update.capture?.content?.meaning) return;
+  let item = list.querySelector('.anki-context-meaning');
+  if (!item) {
+    item = document.createElement('div');
+    item.className = 'translation-item anki-context-meaning';
+    list.appendChild(item);
+  }
+  item.textContent = update.capture.content.meaning;
+}
+
+function attachA4AnkiLookup(targetTooltip, captureIntent) {
+  if (!targetTooltip || !captureIntent) return;
+  targetTooltip._ankiLookupController?.dispose();
+  if (captureIntent.error) {
+    renderA4AnkiLookupUpdate(targetTooltip, {
+      phase: 'error',
+      text: '当前语境无法保存',
+      capture: null,
+    });
+    return;
+  }
+  const facade = globalThis.LingKumaAnki;
+  if (!facade?.startWordLookup) return;
+  const controller = facade.startWordLookup({
+    originSnapshot: captureIntent.snapshot,
+    onUpdate: update => renderA4AnkiLookupUpdate(targetTooltip, update),
+  });
+  targetTooltip._ankiLookupController = controller;
+  controller.ready.catch(() => {});
+}
+
+async function showEnhancedTooltipForWord(word, sentence, wordRect, parent, originalWord, isCustom = false, ankiCaptureIntent = null) {
   // 标记tooltip创建开始
   tooltipCreationInProgress = true;
   tooltipBeingDestroyed = false; // 重置销毁标志
@@ -1489,6 +1555,7 @@ async function showEnhancedTooltipForWord(word, sentence, wordRect, parent, orig
 
 
                         <span class="Notes">${originalWord}</span>
+                        <span class="anki-capture-status" aria-live="polite" hidden style="display:block;font-size:12px;font-weight:400;opacity:.72;margin-top:2px;"></span>
 
 
                      <div style="display: flex; align-items: center; margin-top: 5px;">
@@ -1750,6 +1817,7 @@ async function showEnhancedTooltipForWord(word, sentence, wordRect, parent, orig
 
   // 设置基本HTML
   tooltipEl.innerHTML = tooltipHTML;
+  attachA4AnkiLookup(tooltipEl, ankiCaptureIntent);
 
   // 应用背景设置
   if (isBackgroundVideo && backgroundVideoUrl) {
@@ -3613,11 +3681,13 @@ async function showEnhancedTooltipForWord(word, sentence, wordRect, parent, orig
               }
 
 
-              // 再添加AI推荐项
-              if(freshAI){
+              // Active captures use their persistent enrichment as the sole contextual AI result.
+              if (ankiCaptureIntent) {
+                renderA4AnkiLookupUpdate(tooltipEl, tooltipEl._ankiLookupUpdate);
+              } else if(freshAI){
                 createAIRecommendation(expandedList);
                 createAIRecommendation2(expandedList); // 添加第二个AI推荐
-               } else {
+              } else {
                 // 如果不是全新刷新，使用保存的AI文本内容重新创建AI项
                 if (savedAIText1 !== null) {
                   createAIRecommendation(expandedList, savedAIText1);
@@ -3625,7 +3695,7 @@ async function showEnhancedTooltipForWord(word, sentence, wordRect, parent, orig
                 if (savedAIText2 !== null) {
                   createAIRecommendation2(expandedList, savedAIText2);
                 }
-               }
+              }
 
 
             } else {
@@ -5896,6 +5966,7 @@ async function handleMouseMoveForTooltip(e,isOffscreen = false, activationContex
 
   // 首次进入时批量预加载A4常用设置，后续都从内存缓存读取
   await preloadA4StorageCache();
+  const isActiveLookup = activationContext.activeLookup === true;
 
   // 获取用户设置的gap值，用于tooltip边界检测
   let userGap = getCachedStorageValue('tooltipGap', 50);
@@ -6075,8 +6146,14 @@ if (hoveredDetail) {
 
 
   }else{
-    // console.log("当前窗口的单词与鼠标悬停的单词一致,啥也不做");
-    return
+    if (isActiveLookup) {
+      const { range: activeSentenceRange } = getSentenceForWord(hoveredDetail);
+      attachA4AnkiLookup(
+        tooltipEl,
+        createA4AnkiCaptureIntent(hoveredDetail, activeSentenceRange),
+      );
+    }
+    return;
   }
 
 
@@ -6201,7 +6278,18 @@ if (hoveredDetail) {
     // console.log("鼠标已停留500ms，尝试检测单词，isOffscreen为true");
 
     // 先显示弹窗，不等待TTS
-    showEnhancedTooltipForWord(hoveredDetail.word, sentence, hoveredRect, parent, hoveredDetail.word);
+    const ankiCaptureIntent = isActiveLookup
+      ? createA4AnkiCaptureIntent(hoveredDetail, sentenceRange)
+      : null;
+    showEnhancedTooltipForWord(
+      hoveredDetail.word,
+      sentence,
+      hoveredRect,
+      parent,
+      hoveredDetail.word,
+      false,
+      ankiCaptureIntent,
+    );
 
     // 然后异步播放TTS，不阻塞弹窗显示
     //isAutoWordTTSEnabled 如果开启，这里就不用播放tts了
@@ -9881,6 +9969,7 @@ function handleA4PointerActivation(e) {
       : null;
 
   handleMouseMoveForTooltip(e,true, {
+    activeLookup: true,
     explosionVisibleAtActivation,
     explosionRangeAtActivation,
     explosionSentenceAtActivation
@@ -10129,6 +10218,7 @@ function closeTooltipWithAnimation() {
   const tooltipToRemove = tooltipEl;
   const observerToDisconnect = tooltipResizeObserver;
   const listenerToRemove = currentTooltipKeydownHandler;
+  tooltipToRemove?._ankiLookupController?.dispose();
 
   // 立即清理全局变量，为新弹窗腾出空间
   // 这样即使异步操作还在进行，也不会影响新创建的tooltipEl
