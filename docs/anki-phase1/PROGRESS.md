@@ -10,7 +10,7 @@
 | T01 | PASS | 本任务提交 | `npm run test:anki`（6/6）；连续构建；watch重编译；Chromium 150加载dist并核实后台listener、content facade | Firefox未安装；正式Chrome 153自动加载受发行版命令行限制，使用同机Chromium实测 |
 | T02 | PASS | 本任务提交 | `npm run test:anki`：14组固定identity vectors及offset/Unicode/message边界全部通过 | 无 |
 | T03 | PASS | 本任务提交 | `npm run test:anki:integration`：并发、原子回滚、重启、租约、revision、pendingWrite、迁移8/8通过 | 无 |
-| T04 | TODO | — | — | — |
+| T04 | PASS | 本任务提交 | `npm run test:anki`：协议/错误/timeout/loopback/redirect/profile及写请求单次尝试全部通过 | 本机AnkiConnect仍不可达，真实返回形状留T20 |
 | T05 | TODO | — | — | — |
 | T06 | TODO | — | — | — |
 | T07 | TODO | — | — | — |
@@ -90,6 +90,18 @@
 回归检查：双Webpack compiler构建通过且仅有原有体积警告；repository不引用DOM、网络或遗留词汇库。
 提交：本任务提交。
 下一任务：T04，实现唯一的 AnkiConnect 客户端。
+
+### T04
+
+实际基线：T02/T03 已通过；T00 的本机 AnkiConnect 探测仍不可达。
+修改文件：`src/anki/anki-client.js`、`src/anki/contracts.js`、`tests/anki/unit/anki-client.test.js`、本记录。
+行为变化：新增唯一 AnkiConnect client；固定version 6、手动redirect、loopback origin、可选后台key、超时和结构化错误；仅暴露窄动作封装，禁止sync/loadProfile/任意action；只有读请求可受控重试。
+测试命令：`npm run test:anki:unit`；`npm run test:anki`。
+实际结果：unit 38/38、integration 8/8、e2e 1/1通过；合法null/false/[]及额外响应字段保留；HTTP/JSON/远端错误/断网/timeout分类正确；add/update/media无传输层重试；远端、伪localhost、凭证URL和redirect均拒绝；profile不符停止，不支持检测时返回明确限制。
+未运行的验收：本机没有可达的 AnkiConnect，真实安装版本的动作和返回形状继续保持未验证，留T20。
+回归检查：构建成功且仅有原有体积警告；key只进入请求体，不进入错误详情；没有第二套fetch或任意URL代理。
+提交：本任务提交。
+下一任务：T05，实现专用笔记类型和安全卡片渲染。
 
 ## 最终真实环境验收
 
