@@ -478,7 +478,8 @@ function createWordExplosionTooltip() {
   // 添加一键已知按钮到左侧
   const markAllKnownBtn = document.createElement('button');
   markAllKnownBtn.className = 'word-explosion-mark-all-known-btn word-explosion-left-btn';
-  markAllKnownBtn.title = '一键已知';
+  markAllKnownBtn.title = '全部标为已掌握（不再高亮）';
+  markAllKnownBtn.setAttribute('aria-label', '全部标为已掌握');
   markAllKnownBtn.innerHTML = '✓';
   markAllKnownBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -3226,11 +3227,13 @@ async function createWordItem(wordInfo, forceRefresh = false) {
   });
   wordTitle.appendChild(ttsButton);
 
-  // 添加快捷标记为状态5的按钮
-  const markKnownButton = document.createElement('span');
+  // 添加“已掌握”快捷操作（状态5）
+  const markKnownButton = document.createElement('button');
+  markKnownButton.type = 'button';
   markKnownButton.className = 'word-explosion-mark-known-button';
-  markKnownButton.innerHTML = '✓';
-  markKnownButton.title = '标记为已知(状态5)';
+  markKnownButton.textContent = '✓ 已掌握';
+  markKnownButton.title = '设为已掌握（不再高亮）';
+  markKnownButton.setAttribute('aria-label', `将 ${wordInfo.word} 标为已掌握`);
   markKnownButton.addEventListener('click', (e) => {
     e.stopPropagation();
     // 更新单词状态为5
@@ -5525,11 +5528,11 @@ function injectExplosionStyles() {
 
     /* 单词标题font-size: 13px;  margin-bottom: 3px; */
     .word-explosion-word-title {
-      
       font-weight: 600;
       color: #2c3e50;
       margin-top: -2px;
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 4px;
     }
@@ -5562,13 +5565,18 @@ function injectExplosionStyles() {
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      font-size: 14px;
-      padding: 2px 4px;
+      font: inherit;
+      font-size: 12px;
+      line-height: 18px;
+      padding: 2px 7px;
+      border: 1px solid rgba(76, 175, 80, 0.35);
       border-radius: 7px;
+      background: rgba(76, 175, 80, 0.08);
       transition: all 0.2s;
       user-select: none;
       color: #4CAF50;
       font-weight: bold;
+      white-space: nowrap;
     }
 
     .word-explosion-mark-known-button:hover {

@@ -1755,62 +1755,33 @@ async function showEnhancedTooltipForWord(word, sentence, wordRect, parent, orig
         </div>
 
         <div class="fixed-footer">
+            <div class="status-selector-label">词汇状态</div>
             <div class="bottom-nav">
                 <div class="nav-buttons">
-                    <div class="nav-buttons">
-                        <button class="nav-btn confirm-btn " data-status="0">
-
-                          <!--
-                       
-                         
-                          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M24 45L5.756 34.467V13.533L24 24.066z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M24 24.066L5.756 13.533L24 3l18.243 10.533z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M42.243 34.467L24 45V24.066l18.243-10.533zM24 29.994L5.757 19.461m0 9.078L24 39.072M8.651 23.507l2.913 1.682m-1.457 3.456v-4.297m7.824 4.517l2.912 1.681m-1.456 3.456v-4.296m-6.096.777v-4.297l2.912 5.994v-4.297m26.04-8.422L24 29.994m0 9.078l18.243-10.533m-15.348 2.159l2.912-1.682m-1.456 5.138v-4.297m7.823-4.517l2.913-1.681m-1.456 5.137v-4.297"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M31.535 32.316v-4.297l2.912 2.631v-4.297M20.768 15.399l6.464-3.732m-6.484-.012l6.504 3.756"/></svg>
-                        -->✗
-                          </button>
-
-                        <button class="nav-btn " data-status="1">
-                          <!--
-                        
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M26.643 21.357H24V24h-2.643v2.643h-2.643v2.643h-2.643v2.643h-2.642v2.642h-2.643v2.643H8.143V42.5h5.286v-2.643h2.642v-2.643h2.643v-2.643h2.643v-2.642H24v-2.643h2.643v-2.643h2.643v-5.286zm7.928-7.928h2.643v2.643h-2.643z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M37.214 18.714v-2.643h-2.643V8.143h-2.642V5.5h-5.286v2.643H24v2.643h-2.643v2.643h-2.643v5.285h2.643v2.643h7.929V24h2.643v2.643h5.285V24h2.643v-5.286z"/></svg>
-                        -->
-                       1
-                       
-                        </button>
-
-                        <button class="nav-btn" data-status="2">
-
-                          <!--
-                         
-
-                          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M8.346 36.808v-2.846h2.846v-2.847h2.847v-2.846h2.846v-2.846h2.846v-2.846h2.846v-2.846h2.846v-2.846H16.885v-2.847h-2.846V8.346h2.846V5.5h14.23v2.846h8.539v8.539H42.5v14.23h-2.846v2.847h-2.846v-2.847h-2.846V19.731h-2.847v2.846h-2.846v2.846h-2.846v2.846h-2.846v2.846h-2.846v2.847h-2.846v2.846h-2.846v2.846h-2.847V42.5H5.5v-5.692z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M33.962 8.346v5.693h5.692m-5.692 5.692v-2.846h-2.847v-2.846h-2.846"/></svg>
- -->
- 2
-                        </button>
-
-                        <button class="nav-btn" data-status="3">
-                          <!--
-                         
-                          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M14.75 28.625v2.312h2.312v2.313h2.313v2.312H24v2.313h4.625V33.25h-2.313v-2.313H24v-2.312h-2.313v-2.313h-2.312v-2.273h-2.313v-2.313H14.75v-2.273h-4.625v4.586h2.312v4.586z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M40.187 5.5h-4.625v2.312H33.25v2.313h-2.313v2.312h-2.312v2.313h-2.313v2.312H24v2.313h-2.313v2.313h-2.312v4.624h2.312v2.313h4.625v-2.313h2.313V24h2.312v-2.312h2.313v-2.313h2.312v-2.313h2.313V14.75h2.312v-2.313H42.5V5.5zM14.75 30.937h-2.313v2.313h-2.312h0v2.312H5.5V42.5h6.937v-4.625h2.313v-2.313h2.312v-4.625z"/></svg>
- -->
- 3
-                        </button>
-                        <button class="nav-btn" data-status="4">
-
-                          <!--
-                         
-                          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M5.5 24v-3.083h3.083V14.75h3.084v-3.083h3.083V8.583h6.167V5.5H24v3.083h3.083v3.084h2.706v3.083h-2.706v3.083H24v3.084h3.083V24h3.084v3.083h3.083v3.084h3.083v3.083h3.195v3.083H42.5V42.5h-6.167v-3.083H33.25v-3.084h-3.083V33.25h-3.084v-3.083H24v-3.084h-3.083V24h-3.084v3.083H14.75v3.084h-3.083v-3.084H8.583V24z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M17.833 8.583v3.083H14.75v3.084h-3.083v3.083H8.583M24 20.917h-3.083V24"/></svg>
- -->
- 4
-                        </button>
-
-                        <button class="nav-btn confirm-btn" data-status="5">
-                          <!--
-                         
-                           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 48 48"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M24 24v21.5m4.965-27.95l2.482-1.433v-5.734L28.965 8.95h-9.93l-2.483 1.433v5.734l2.482 1.433z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="m24 2.5l18.62 10.75v21.5L24 45.5L5.38 34.75v-21.5z"/><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" d="M5.38 13.25L24 24l18.62-10.75M8.483 31.525v-7.167l6.207-3.583l6.206 10.75v7.167l-1.24.716l-9.931-5.733zm31.033 0v-7.167l-6.207-3.583l-6.206 10.75v7.167l1.241.716l9.93-5.733z"/><circle cx="21.517" cy="11.817" r=".75" fill="currentColor"/><circle cx="24" cy="13.25" r=".75" fill="currentColor"/><circle cx="26.483" cy="11.817" r=".75" fill="currentColor"/><circle cx="26.483" cy="14.683" r=".75" fill="currentColor"/><circle cx="21.517" cy="14.683" r=".75" fill="currentColor"/><circle cx="14.69" cy="26.508" r=".75" fill="currentColor"/><circle cx="12.208" cy="27.942" r=".75" fill="currentColor"/><circle cx="14.69" cy="29.375" r=".75" fill="currentColor"/><circle cx="17.173" cy="30.808" r=".75" fill="currentColor"/><circle cx="17.173" cy="33.675" r=".75" fill="currentColor"/><circle cx="14.69" cy="32.242" r=".75" fill="currentColor"/><circle cx="12.208" cy="30.808" r=".75" fill="currentColor"/><circle cx="30.827" cy="30.808" r=".75" fill="currentColor"/><circle cx="33.31" cy="29.375" r=".75" fill="currentColor"/><circle cx="33.31" cy="26.508" r=".75" fill="currentColor"/><circle cx="35.792" cy="27.942" r=".75" fill="currentColor"/><circle cx="35.792" cy="30.808" r=".75" fill="currentColor"/><circle cx="33.31" cy="32.242" r=".75" fill="currentColor"/><circle cx="30.827" cy="33.675" r=".75" fill="currentColor"/></svg>
- -->
- ✓
-
-                        </button>
-                    </div>
+                    <button class="nav-btn nav-btn-remove" data-status="0" title="移除：从词库中删除" aria-label="从词库中移除">
+                        <span class="nav-btn-symbol">✗</span>
+                        <span class="nav-btn-label">移除</span>
+                    </button>
+                    <button class="nav-btn" data-status="1" title="生词：黄色高亮" aria-label="设为生词">
+                        <span class="nav-btn-symbol">1</span>
+                        <span class="nav-btn-label">生词</span>
+                    </button>
+                    <button class="nav-btn" data-status="2" title="在学：较浅黄色高亮" aria-label="设为在学">
+                        <span class="nav-btn-symbol">2</span>
+                        <span class="nav-btn-label">在学</span>
+                    </button>
+                    <button class="nav-btn" data-status="3" title="熟悉：浅色高亮" aria-label="设为熟悉">
+                        <span class="nav-btn-symbol">3</span>
+                        <span class="nav-btn-label">熟悉</span>
+                    </button>
+                    <button class="nav-btn" data-status="4" title="很熟：仅显示下划线" aria-label="设为很熟">
+                        <span class="nav-btn-symbol">4</span>
+                        <span class="nav-btn-label">很熟</span>
+                    </button>
+                    <button class="nav-btn nav-btn-mastered" data-status="5" title="已掌握：不再高亮" aria-label="设为已掌握">
+                        <span class="nav-btn-symbol">✓</span>
+                        <span class="nav-btn-label">已掌握</span>
+                    </button>
                 </div>
             </div>
             <button class="expand-collapse-btn">
@@ -7894,35 +7865,61 @@ html[data-theme='dark'] .sound-icon svg path {
     font-size: 12px;
 }
 
-.bottom-nav {
-    display: flex;
-    justify-content: space-between;
-   /*  padding: 12px 0; */
+.status-selector-label {
+    margin-bottom: 5px;
+    color: var(--text-color);
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.78;
 }
 
-/* 修改底部导航按钮容器样式 */
+.bottom-nav {
+    display: flex;
+}
+
 .nav-buttons {
     display: flex;
     width: 100%;
-    justify-content: space-between;
-    align-items: center;
+    gap: 6px;
+    align-items: stretch;
 }
 
 .nav-btn {
     font-family: 'LXGWWenKai' !important;
-    width: 43px;
-    height: 43px;
-    border-radius: 50%;
-    border: 1px solid rgb(189,194,202) ;
+    min-width: 0;
+    height: 52px;
+    flex: 1 1 0;
+    border-radius: 12px;
+    border: 1px solid rgb(189,194,202);
     background: #d1d5c736;
     color: var(--text-color);
     cursor: pointer;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    font-size: 18px;  /* 增大字体 */
-    font-weight: bold; /* 加粗 */
-    transition: transform 0.2s ease-in-out; /* <--- 添加过渡效果 --- */
+    gap: 1px;
+    font-weight: bold;
+    transition: transform 0.2s ease-in-out;
+}
+
+.nav-btn-symbol {
+    font-size: 17px;
+    line-height: 18px;
+}
+
+.nav-btn-label {
+    font-size: 11px;
+    line-height: 14px;
+    white-space: nowrap;
+}
+
+.nav-btn-remove {
+    color: #d9534f;
+}
+
+.nav-btn-mastered {
+    color: #3f9d52;
 }
 
 /* --- 新增：nav-btn 悬停动画 --- */
@@ -7931,25 +7928,6 @@ html[data-theme='dark'] .sound-icon svg path {
 }
 /* --- 动画结束 --- */
 
-/*
-.confirm-btn {
-    background:rgba(0, 0, 0, 0);
-    color: var(--confirm-button-color);
-    border: 1px solid rgba(189, 194, 202, 0);
-    padding: 0;   确保SVG居中  width: 43px;
-    height: 43px;
-
-}
-*/
-.confirm-btn svg {
-    width: 48px;
-    height: 48px;
-    margin: -3px;
-}
-
-.confirm-btn svg path {
- /*     stroke: var(--confirm-button-color);*/
-}
 
 .phrase-item {
     padding: 8px 0;
@@ -8546,13 +8524,6 @@ shadowRoot.appendChild(style);
 
     }
 
-/* 放在这里是为了不让confirm的样式被覆盖。
-.dark-mode .confirm-btn {
-
-    border-color: rgba(0, 0, 0, 0);
-    background: #25171700;
-}
- */
 
 
     .dark-mode .close-btn-words svg path,
