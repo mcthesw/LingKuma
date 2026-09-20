@@ -23,9 +23,9 @@
 | T14 | PASS | 本任务提交 | `npm run test:anki`：unit 64/64、integration 47/47、e2e 1/1；Chromium最终短语一次保存，网页/EPUB/PDF/字幕/iframe真实选区均持久化 | 外部阅读器与真实Anki自动写入合并验收留T20 |
 | T15 | PASS | 本任务提交 | `npm run test:anki`：unit 67/67、integration 52/52、e2e 1/1；Supertone真实协议适配、内容哈希媒体、文字先写、上传中断复用及旧voice结果隔离通过 | 未消耗用户Supertone额度；真实Anki媒体播放留T20专用测试数据 |
 | T16 | PASS | 本任务提交 | `npm run test:anki`：unit 67/67、integration 57/57、e2e 1/1；管理搜索/分页/分组、编辑、冲突/缺失/多匹配、打开关联、停止/恢复通过；Chromium验证最终管理页 | 真实Anki上的管理全链留T20；浏览器UI使用受控后台DTO，未修改用户数据 |
-| T17 | TODO | — | — | — |
-| T18 | TODO | — | — | — |
-| T19 | TODO | — | — | — |
+| T17 | PASS | `6845a3e` | `npm run test:anki`：unit 67/67、integration 60/60、e2e 1/1；接管、巡检、重绑定及管理核对通过；Chromium验证最终核对入口 | 六小时间隔以受控时钟推进；真实Anki外部编辑/删除留T20 |
+| T18 | PASS | `2b08002` | `npm run test:anki`：unit 67/67、integration 64/64、e2e 1/1；版本化备份、严格校验、安全合并及媒体恢复通过；Chromium验证最终导入导出入口 | 未写用户下载目录或真实Anki媒体；Firefox未安装 |
+| T19 | PASS | 本任务提交 | `npm run test:anki`：unit 74/74、integration 64/64、e2e 1/1；安全targeted 42/42；Chromium验证最终敏感选择守卫和单监听 | 未在真实密码管理器输入凭证；Firefox未安装 |
 | T20 | TODO | — | — | — |
 | T21 | TODO | — | — | — |
 
@@ -270,6 +270,18 @@
 回归检查：导入不删库、不重建库、不写meta设置，不读取或上传云端；任何记录/媒体校验失败均在写事务前终止。恢复任务均为重新生成的无lease任务，绝不恢复旧pendingWrite；同ID已有记录不会因备份时间戳或旧synced状态被覆盖。关联、媒体和内容写入继续经过既有巡检、差异保护及串行调度。
 提交：本任务提交。
 下一任务：T19，收紧安全边界并完成隐私回归。
+
+### T19
+
+实际基线：AnkiConnect客户端已有精确loopback端点、手动重定向和action白名单，渲染器与模型适配也已有输入边界；剩余缺口是同命名空间消息仍接受额外字段/数组payload，可信管理与content能力缺少一体化越权回归，重复初始化会重复注册划词全局监听，密码框/表单/contenteditable选择没有统一拒绝，部分tooltip直接移除路径未释放Anki状态订阅。
+修改文件：`src/anki/runtime.js`、`src/anki/contracts.js`、`src/anki/content-adapter.js`、`src/service/a4_tooltip_new.js`、`src/service/a5_custom_word_selection.js`、`tests/anki/unit/runtime.test.js`、`tests/anki/unit/content-adapter.test.js`、`tests/anki/unit/security-boundary.test.js`、`tests/anki/unit/selection-lifecycle.test.js`、本记录。
+行为变化：同命名空间消息现在只接受精确`namespace/requestId/type/payload`四字段普通对象，requestId/type均限制1–128字符，payload拒绝null/数组；外部消息仍无副作用忽略。管理能力继续只允许本扩展options/manager路径，content能力只允许本扩展tab/frame；content facade仅暴露lookup/get/lookupState，没有列表、备份、设置、任意action或URL接口。统一识别input/textarea/select及可编辑区域，划词的mouseup/touch/selectionchange路径均不读取或弹出敏感选择；黑名单检查不能再被二次初始化绕过。划词初始化使用单例哨兵，pagehide移除六类捕获监听及timer。通知订阅逐个隔离异常；tooltip正常关闭、错误清理、删词和快捷键替换路径统一释放lookup controller，迟到通知不再更新已移除UI。新增正式`FORBIDDEN`错误码。
+测试命令：`node --test tests/anki/unit/runtime.test.js tests/anki/unit/content-adapter.test.js tests/anki/unit/security-boundary.test.js tests/anki/unit/selection-lifecycle.test.js tests/anki/unit/anki-client.test.js tests/anki/unit/note-model.test.js tests/anki/unit/provider-adapter.test.js`；`npm run test:anki`；`browser-use`加载最终content bundle与真实密码输入fixture，检查构建后的敏感选择守卫、消息数和runtime监听数。
+实际结果：targeted 42/42通过；全套unit 74/74、integration 64/64、e2e 1/1通过，构建仅有既有包体积警告。A09继续证明localhost.evil、远端/带凭证/带路径端点及重定向拒绝，写请求未知结果不盲重试；A13证明HTML、媒体指令、LaTeX、恶意来源和长文本只作惰性文本；A17证明模型材料有界且注入语句/额外action不能改变协议。A47证明网页/外部扩展/content sender无法调用管理能力，管理页也不能调用content capture；公开settings只有hasApiKey，公开capture无noteId/base/pendingWrite，备份泄密回归由T18继续覆盖。A48证明重复facade/划词初始化各只保留一份监听，pagehide清理后为0，黑名单二次初始化仍为0，controller重复dispose只执行一次。最终构建在浏览器中对密码值`do-not-capture`返回blocked=true，网络消息0，runtime监听1。
+未运行的验收：浏览器fixture验证最终构建的守卫与监听面，没有在真实网站密码管理器/复杂shadow-DOM编辑器中输入真实凭证；这些路径由DOM节点/Shadow host单元回归覆盖。Firefox仍未安装，真实Chrome/Firefox重复注入与frame导航留T20/T21记录。
+回归检查：未增加通用fetch代理、外部消息入口、任意Anki action或云端同步。Anki key只在后台IndexedDB私有settings中读取；公开DTO、日志路径、备份和旧WebDAV均没有读取该meta key。内容查询仍只发送冻结且有界的当前语境；失败通知不聚焦页面且单个渲染异常不阻断持久化或其他订阅者。
+提交：本任务提交。
+下一任务：T20，完成故障注入与真实链路验收。
 
 ## 最终真实环境验收
 

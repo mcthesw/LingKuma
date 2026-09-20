@@ -6,7 +6,7 @@ const RUNTIME_STATE_KEY = '__lingkumaAnkiRuntimeV1';
 function errorResponse(requestId, code, message, retryable = false) {
   return {
     ok: false,
-    requestId: typeof requestId === 'string' ? requestId : null,
+    requestId: typeof requestId === 'string' && requestId.length <= 128 ? requestId : null,
     error: { code, message, retryable },
   };
 }
@@ -24,6 +24,12 @@ function normalizeHandlerError(requestId, error) {
   return errorResponse(requestId, 'INTERNAL_ERROR', 'Anki integration request failed.');
 }
 
+function isPlainPayload(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
 function createMessageRouter(handlers) {
   return function routeAnkiMessage(message, sender, sendResponse) {
     if (!message || message.namespace !== ANKI_NAMESPACE) {
@@ -31,7 +37,12 @@ function createMessageRouter(handlers) {
     }
 
     const requestId = message.requestId;
-    if (typeof requestId !== 'string' || requestId.length === 0 || typeof message.type !== 'string') {
+    const keys = isPlainPayload(message) ? Object.keys(message) : [];
+    if (keys.length !== 4
+        || keys.some(key => !['namespace', 'requestId', 'type', 'payload'].includes(key))
+        || typeof requestId !== 'string' || requestId.length === 0 || requestId.length > 128
+        || typeof message.type !== 'string' || message.type.length === 0 || message.type.length > 128
+        || !isPlainPayload(message.payload)) {
       sendResponse(errorResponse(requestId, 'INPUT_INVALID', 'Invalid Anki integration message.'));
       return false;
     }
@@ -102,5 +113,6 @@ module.exports = {
   ANKI_NAMESPACE,
   RUNTIME_STATE_KEY,
   createMessageRouter,
+  isPlainPayload,
   initializeAnkiRuntime,
 };

@@ -5,7 +5,10 @@ const assert = require('node:assert/strict');
 const {
   captureStatusText,
   createWordLookupController,
+  disposeLookupController,
   freezeWordOriginSnapshot,
+  installContentFacade,
+  isSensitiveSelectionTarget,
 } = require('../../../src/anki/content-adapter');
 
 function capture(captureId, status, meaning = '') {
@@ -125,4 +128,76 @@ test('paused lookup remains a normal non-persisting UI state', async () => {
   assert.equal(updates.at(-1).text, 'Anki 自动摘录已暂停');
   assert.equal(captureStatusText(null, { paused: true }), updates.at(-1).text);
   controller.dispose();
+});
+
+test('content facade reinjection keeps one listener and exposes only narrow capture requests', async () => {
+  const runtimeListeners = [];
+  const messages = [];
+  const browserApi = {
+    runtime: {
+      lastError: null,
+      onMessage: { addListener: listener => runtimeListeners.push(listener) },
+      sendMessage(message, callback) {
+        messages.push(message);
+        callback({ ok: true, requestId: message.requestId, data: { captureId: 'capture-a' } });
+      },
+    },
+  };
+  const scope = { crypto: { randomUUID: () => 'request-1' } };
+  const first = installContentFacade({ browserApi, scope });
+  const second = installContentFacade({ browserApi, scope });
+  assert.equal(first, second);
+  assert.equal(runtimeListeners.length, 1);
+  assert.equal(first.listCaptures, undefined);
+  assert.equal(first.exportBackup, undefined);
+  assert.equal(first.saveSettings, undefined);
+
+  let delivered = 0;
+  first.onCaptureChanged(() => { throw new Error('renderer failed'); });
+  first.onCaptureChanged(() => { delivered += 1; });
+  runtimeListeners[0]({
+    namespace: 'lingkuma.anki.v1',
+    type: 'capture.changed',
+    payload: { captureId: 'capture-a' },
+  });
+  assert.equal(delivered, 1);
+  await first.captureLookup({ lookupSessionId: 'lookup-1', originSnapshot: {} });
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].type, 'capture.lookup');
+});
+
+test('selection guard rejects form controls and editable regions without blocking article text', () => {
+  function element(selector, parentElement = null, contenteditable = null) {
+    return {
+      nodeType: 1,
+      parentElement,
+      matches(query) {
+        if (query === 'input, textarea, select') return query.split(', ').includes(selector);
+        return query === '[contenteditable]' && contenteditable !== null;
+      },
+      getAttribute(name) {
+        return name === 'contenteditable' ? contenteditable : null;
+      },
+      getRootNode: () => ({ host: null }),
+    };
+  }
+  const article = element('article');
+  const input = element('input', article);
+  const editable = element('div', article, 'true');
+  const nested = element('span', editable);
+  const shadowText = element('span');
+  shadowText.getRootNode = () => ({ host: editable });
+  assert.equal(isSensitiveSelectionTarget({ selection: { anchorNode: input, focusNode: input, rangeCount: 0 } }), true);
+  assert.equal(isSensitiveSelectionTarget({ selection: { anchorNode: nested, focusNode: nested, rangeCount: 0 } }), true);
+  assert.equal(isSensitiveSelectionTarget({ selection: { anchorNode: shadowText, focusNode: shadowText, rangeCount: 0 } }), true);
+  assert.equal(isSensitiveSelectionTarget({ selection: { anchorNode: article, focusNode: article, rangeCount: 0 } }), false);
+});
+
+test('tooltip lookup disposal runs once and clears the controller reference', () => {
+  let disposals = 0;
+  const target = { _ankiLookupController: { dispose: () => { disposals += 1; } } };
+  disposeLookupController(target);
+  disposeLookupController(target);
+  assert.equal(disposals, 1);
+  assert.equal(Object.hasOwn(target, '_ankiLookupController'), false);
 });

@@ -60,6 +60,32 @@ test('runtime ignores every foreign message without side effects', () => {
   assert.equal(responded, false);
 });
 
+test('runtime rejects malformed same-namespace envelopes before handler dispatch', () => {
+  const browserApi = createBrowserApi();
+  let calls = 0;
+  initializeAnkiRuntime({
+    browserApi,
+    scope: {},
+    handlers: { ping: () => { calls += 1; } },
+  });
+  const base = { namespace: ANKI_NAMESPACE, requestId: 'r1', type: 'ping', payload: {} };
+  const invalid = [
+    { ...base, unexpected: true },
+    { ...base, payload: [] },
+    { ...base, payload: null },
+    { ...base, requestId: 'r'.repeat(129) },
+    { ...base, type: '' },
+    { ...base, type: 'x'.repeat(129) },
+  ];
+  for (const message of invalid) {
+    let response;
+    assert.equal(browserApi.listeners[0](message, {}, value => { response = value; }), false);
+    assert.equal(response.ok, false);
+    assert.equal(response.error.code, 'INPUT_INVALID');
+  }
+  assert.equal(calls, 0);
+});
+
 test('runtime only keeps the channel open for asynchronous handlers', async () => {
   const browserApi = createBrowserApi();
   initializeAnkiRuntime({

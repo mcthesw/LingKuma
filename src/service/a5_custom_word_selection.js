@@ -10,6 +10,7 @@ let lastSelectionRange = null;
 let isInCustomWordBlacklist = false; // 当前网站是否在黑名单中（与高亮黑名单同步）
 let selectionChangeTimer = null; // 用于 selectionchange 事件的防抖计时器
 let isCreatingPopup = false; // 防止同时创建多个弹窗的标志
+let customWordSelectionInitialized = false;
 
 // 跟踪鼠标/触控位置，用于词组创建时的弹窗定位
 window.lastMouseX = 0;
@@ -37,8 +38,22 @@ document.addEventListener('touchend', (e) => {
   }
 }, { passive: true });
 
+function selectionTouchesSensitiveControl(selection, eventTarget = null) {
+  const guard = globalThis.LingKumaAnki?.isSensitiveSelectionTarget;
+  if (typeof guard === 'function') return guard({ selection, target: eventTarget });
+  const nodes = [eventTarget, selection?.anchorNode, selection?.focusNode];
+  return nodes.some(node => {
+    const element = node?.nodeType === 1 ? node : node?.parentElement;
+    const control = element?.closest?.('input, textarea, select, [contenteditable]');
+    return control && (!control.hasAttribute('contenteditable')
+      || String(control.getAttribute('contenteditable')).toLowerCase() !== 'false');
+  });
+}
+
 // 初始化自定义查词功能
 function initCustomWordSelection() {
+  if (customWordSelectionInitialized) return;
+  customWordSelectionInitialized = true;
   console.log('初始化自定义查词功能');
 
   // 监听鼠标抬起事件，检测文本选择
@@ -59,12 +74,31 @@ function initCustomWordSelection() {
 
   // 监听键盘事件，ESC关闭弹窗
   document.addEventListener('keydown', handleKeyDown, true);
+  window.addEventListener('pagehide', disposeCustomWordSelection, { once: true });
+}
+
+function disposeCustomWordSelection() {
+  if (!customWordSelectionInitialized) return;
+  customWordSelectionInitialized = false;
+  document.removeEventListener('mouseup', handleTextSelection, true);
+  document.removeEventListener('touchend', handleTextSelection, true);
+  document.removeEventListener('selectionchange', handleSelectionChange, true);
+  document.removeEventListener('click', handleDocumentClick, true);
+  document.removeEventListener('touchstart', handleDocumentClick, true);
+  document.removeEventListener('keydown', handleKeyDown, true);
+  clearTimeout(selectionChangeTimer);
+  selectionChangeTimer = null;
+  hideCustomWordSelectionPopup();
 }
 
 // 处理文本选择
 async function handleTextSelection(e) {
   // 检查是否在黑名单中（与高亮黑名单同步）
   if (isInCustomWordBlacklist) return;
+  if (selectionTouchesSensitiveControl(window.getSelection(), e.target)) {
+    hideCustomWordSelectionPopup();
+    return;
+  }
 
   // 如果功能被禁用，直接返回
   if (!isCustomWordSelectionEnabled) return;
@@ -82,6 +116,10 @@ async function handleTextSelection(e) {
   // 延迟处理，确保选择完成
   setTimeout(async () => {
     const selection = window.getSelection();
+    if (selectionTouchesSensitiveControl(selection, e.target)) {
+      hideCustomWordSelectionPopup();
+      return;
+    }
     const selectedText = selection.toString().trim();
 
     console.log(`选中的文本: "${selectedText}", 长度: ${selectedText.length}`);
@@ -147,6 +185,10 @@ async function handleSelectionChange() {
     if (window.isWordByWordHighlighting) return;
 
     const selection = window.getSelection();
+    if (selectionTouchesSensitiveControl(selection)) {
+      hideCustomWordSelectionPopup();
+      return;
+    }
     const selectedText = selection.toString().trim();
 
     console.log(`[selectionchange] 检测到选择变化: "${selectedText}", 长度: ${selectedText.length}`);
@@ -716,9 +758,10 @@ function initCustomWordSelectionWithBlacklistCheck() {
 }
 
 // 导出函数供其他模块使用
-window.initCustomWordSelection = initCustomWordSelection;
+window.initCustomWordSelection = initCustomWordSelectionWithBlacklistCheck;
 window.toggleCustomWordSelection = toggleCustomWordSelection;
 window.hideCustomWordSelectionPopup = hideCustomWordSelectionPopup;
+window.disposeCustomWordSelection = disposeCustomWordSelection;
 
 // 自动初始化（使用黑名单检查）
 if (document.readyState === 'loading') {

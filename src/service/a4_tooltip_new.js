@@ -577,6 +577,16 @@ window.addEventListener('error', function(event) {
   // 不阻止错误，但记录下来
 });
 
+function disposeA4AnkiLookup(targetTooltip) {
+  const dispose = globalThis.LingKumaAnki?.disposeLookupController;
+  if (typeof dispose === 'function') {
+    dispose(targetTooltip);
+    return;
+  }
+  targetTooltip?._ankiLookupController?.dispose();
+  if (targetTooltip?._ankiLookupController) delete targetTooltip._ankiLookupController;
+}
+
 // 清空所有弹窗和窗口的函数
 function clearAllPopupsAndWindows() {
   console.log('开始清理所有弹窗和窗口...');
@@ -585,6 +595,7 @@ function clearAllPopupsAndWindows() {
   if (tooltipEl) {
     console.log('清理主弹窗...');
     try {
+      disposeA4AnkiLookup(tooltipEl);
       // 立即移除弹窗元素
       tooltipEl.remove();
 
@@ -1039,7 +1050,7 @@ function renderA4AnkiLookupUpdate(targetTooltip, update) {
 
 function attachA4AnkiLookup(targetTooltip, captureIntent) {
   if (!targetTooltip || !captureIntent) return;
-  targetTooltip._ankiLookupController?.dispose();
+  disposeA4AnkiLookup(targetTooltip);
   if (captureIntent.error) {
     renderA4AnkiLookupUpdate(targetTooltip, {
       phase: 'error',
@@ -5308,6 +5319,7 @@ function deleteWordFromDatabase(word, originalWord, isCustom = false) {
 
       // 关闭当前tooltip
       if (tooltipEl) {
+        disposeA4AnkiLookup(tooltipEl);
         tooltipEl.remove();
         tooltipEl = null;
         currentTooltipWord = null;
@@ -9836,6 +9848,7 @@ document.addEventListener('keydown', function(e) {
             document.removeEventListener("keydown", currentTooltipKeydownHandler, false);
             currentTooltipKeydownHandler = null;
           }
+          disposeA4AnkiLookup(tooltipEl);
           tooltipEl.remove();
           tooltipEl = null;
         }
@@ -10213,7 +10226,7 @@ function closeTooltipWithAnimation() {
   const tooltipToRemove = tooltipEl;
   const observerToDisconnect = tooltipResizeObserver;
   const listenerToRemove = currentTooltipKeydownHandler;
-  tooltipToRemove?._ankiLookupController?.dispose();
+  disposeA4AnkiLookup(tooltipToRemove);
 
   // 立即清理全局变量，为新弹窗腾出空间
   // 这样即使异步操作还在进行，也不会影响新创建的tooltipEl

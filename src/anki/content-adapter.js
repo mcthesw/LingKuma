@@ -63,6 +63,37 @@ function freezeWordOriginSnapshot({
   });
 }
 
+function sensitiveElement(node) {
+  let element = node?.nodeType === 1 ? node : node?.parentElement;
+  while (element) {
+    if (typeof element.matches === 'function') {
+      if (element.matches('input, textarea, select')) return true;
+      if (element.matches('[contenteditable]')
+          && String(element.getAttribute('contenteditable')).toLowerCase() !== 'false') return true;
+    }
+    element = element.parentElement || element.getRootNode?.().host || null;
+  }
+  return false;
+}
+
+function isSensitiveSelectionTarget({ selection, target } = {}) {
+  if (sensitiveElement(target) || sensitiveElement(selection?.anchorNode)
+      || sensitiveElement(selection?.focusNode)) return true;
+  if (selection?.rangeCount > 0) {
+    try {
+      return sensitiveElement(selection.getRangeAt(0).commonAncestorContainer);
+    } catch (_) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function disposeLookupController(target) {
+  target?._ankiLookupController?.dispose();
+  if (target?._ankiLookupController) delete target._ankiLookupController;
+}
+
 function captureStatusText(capture, { paused = false } = {}) {
   if (paused) return 'Anki 自动摘录已暂停';
   if (!capture) return '正在保存摘录…';
@@ -158,7 +189,13 @@ function createContentFacade({ browserApi, scope = globalThis } = {}) {
       }
       const capture = message.payload;
       if (!capture || typeof capture.captureId !== 'string') return false;
-      for (const listener of [...changeListeners]) listener(capture);
+      for (const listener of [...changeListeners]) {
+        try {
+          listener(capture);
+        } catch (_) {
+          // One tooltip renderer must not block other subscribers.
+        }
+      }
       return false;
     });
   }
@@ -200,6 +237,8 @@ function createContentFacade({ browserApi, scope = globalThis } = {}) {
       changeListeners.add(listener);
       return () => changeListeners.delete(listener);
     },
+    disposeLookupController,
+    isSensitiveSelectionTarget,
     freezeWordOriginSnapshot,
     freezeReaderOriginSnapshot(options) {
       return freezeReaderOriginSnapshot({
@@ -237,7 +276,9 @@ module.exports = {
   captureStatusText,
   createContentFacade,
   createWordLookupController,
+  disposeLookupController,
   freezeWordOriginSnapshot,
+  isSensitiveSelectionTarget,
   freezeReaderOriginSnapshot,
   installContentFacade,
 };
