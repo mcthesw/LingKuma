@@ -34,7 +34,6 @@ const CONTENT_TO_ANKI_FIELD = Object.freeze({
   source: 'Source',
 });
 
-
 function initializeSchema(database, oldVersion) {
   if (oldVersion < 1) {
     const captures = database.createObjectStore('captures', { keyPath: 'captureId' });
@@ -188,6 +187,9 @@ class AnkiRepository {
           jobs.add(createJob(capture.captureId, 'enrich', now, { generation: 1 }));
         } else {
           jobs.add(createJob(capture.captureId, 'push', now, { revision: 0 }));
+        }
+        if (capture.mediaState === 'pending') {
+          jobs.add(createJob(capture.captureId, 'media', now));
         }
         created = true;
       }
@@ -561,6 +563,7 @@ class AnkiRepository {
             revision: capture.contentRevision,
           }));
         }
+        if (capture.mediaState === 'pending') jobs.put(createJob(captureId, 'media', capture.updatedAt));
       }
       await transactionDone(transaction);
       return clone(capture);
@@ -694,6 +697,4 @@ module.exports = {
   STORE_NAMES,
   createJob,
   openAnkiRepository,
-  requestResult,
-  transactionDone,
 };

@@ -18,6 +18,8 @@ class FakeAnki {
     this.nextNoteId = 1000;
     this.afterAdd = null;
     this.afterUpdate = null;
+    this.media = new Map();
+    this.afterStoreMedia = null;
   }
 
   async getProfileStatus(expectedProfile) {
@@ -106,6 +108,14 @@ class FakeAnki {
       await this.afterUpdate({ noteId, note, fields: clone(fields) });
     }
     return null;
+  }
+  async storeMediaFile(filename, data) {
+    this.calls.push({ action: 'storeMediaFile', filename, data });
+    this.media.set(filename, data);
+    if (this.afterStoreMedia) {
+      await this.afterStoreMedia({ filename, data });
+    }
+    return filename;
   }
 
   seedNote(note) {

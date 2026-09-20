@@ -21,7 +21,7 @@
 | T12 | PASS | 本任务提交 | `npm run test:anki`：设置/凭证/绑定/profile/model/deck/可信路由共46/46 integration通过；Chromium真实连接AnkiConnect 6 | 未创建真实模型，写入验收留T20 |
 | T13 | PASS | 本任务提交 | `npm run test:anki`：unit 60/60、integration 47/47、e2e 1/1；Chromium主动点击持久化且悬浮/发音/关闭不新增 | 隔离profile未配置Anki，真实最终写入留T20 |
 | T14 | PASS | 本任务提交 | `npm run test:anki`：unit 64/64、integration 47/47、e2e 1/1；Chromium最终短语一次保存，网页/EPUB/PDF/字幕/iframe真实选区均持久化 | 外部阅读器与真实Anki自动写入合并验收留T20 |
-| T15 | TODO | — | — | — |
+| T15 | PASS | 本任务提交 | `npm run test:anki`：unit 67/67、integration 52/52、e2e 1/1；Supertone真实协议适配、内容哈希媒体、文字先写、上传中断复用及旧voice结果隔离通过 | 未消耗用户Supertone额度；真实Anki媒体播放留T20专用测试数据 |
 | T16 | TODO | — | — | — |
 | T17 | TODO | — | — | — |
 | T18 | TODO | — | — | — |
@@ -222,6 +222,18 @@
 回归检查：最终构建成功且仅有原有体积警告；content bundle为10.7 KiB。整句分析按钮仍只走原分析功能，点击单词不会扩成短语，Create之外的选区变化不调用capture。
 提交：本任务提交。
 下一任务：T15，复用可导出发音渠道并以独立幂等任务附加Anki媒体。
+
+### T15
+
+实际基线：设置已有`attachAudio`且schema预留media store/job/state，Anki client已有`storeMediaFile`，但没有媒体任务、字节导出适配或Audio更新流程；现有本地/Edge等播放路径不能直接作为持久媒体。
+修改文件：`src/anki/audio-provider.js`、`src/anki/media-service.js`、`src/anki/media-store.js`、`src/anki/repository.js`、`src/anki/scheduler.js`、`src/anki/background-runtime.js`、`tests/anki/support/fake-anki.js`、`tests/anki/unit/audio-provider.test.js`、`tests/anki/integration/media-service.test.js`、本记录。
+行为变化：仅当用户启用单词TTS并选择已配置Supertone时，后台按现有voice/model/language/format配置直接取得词语音频字节，不依赖popup播放；本地TTS、speechSynthesis、blob URL及其他不可导出渠道明确标记unavailable。响应限制5 MiB并同时核验音频MIME和MP3/WAV/OGG文件头，拒绝HTML/空内容；以SHA-256生成`lk_audio_<hash>.<ext>`并持久化字节及Anki实际文件名。调度严格先完成文字push，再串行处理media，上传后把Audio作为dirty intent交回同一push/三方差异路径。job在网络请求前持久化term/language/voice等inputKey，完成前重读配置阻止旧音频迟到；上传后的本地状态让worker中断重试复用同一文件，不新建笔记或随机文件。音频unavailable/failed只改变mediaState，不回滚已同步文字；profile/认证等共享配置错误保留任务并服从全局阻断/修复。
+测试命令：`node --test tests/anki/unit/audio-provider.test.js tests/anki/integration/media-service.test.js tests/anki/integration/scheduler.test.js`；`npm run build`；`npm run test:anki`。
+实际结果：targeted 13/13通过；全套unit 67/67、integration 52/52、e2e 1/1通过。验证真实Supertone请求形状与复用配置、不可导出渠道降级、HTTPS/凭证边界、MIME/头/大小拒绝、确定性哈希文件名、文字先成功、同一note追加完整sound引用、上传后worker中断不重复上传、voice切换旧结果不附加；最终构建成功且仅有原有体积警告，content bundle仍为10.7 KiB。
+未运行的验收：为不未经授权消耗用户Supertone额度或向用户Anki写入媒体，本任务未调用真实账号；真实Supertone返回、AnkiConnect `storeMediaFile`返回形状及Reviewer播放按计划在T20专用牌组/记录中验收，不把mock网络边界写成真实播放通过。Firefox仍未安装。
+回归检查：文本add/update/冲突仍只经SyncService；音频失败场景link保持synced且addNote仍为一次；不截视频、不生成整句、不录系统音频、不删除远端孤儿媒体；生产background已装配同一持久调度器。
+提交：本任务提交。
+下一任务：T16，实现摘录管理、编辑、停止/恢复及异常处理。
 
 ## 最终真实环境验收
 

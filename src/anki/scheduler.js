@@ -84,6 +84,7 @@ class JobScheduler {
     enrichmentCoordinator,
     syncService,
     alarmClock,
+    mediaService = { processClaimedJob: async () => ({ status: 'idle' }) },
     now = Date.now,
     monotonicNow = () => globalThis.performance?.now?.() ?? Date.now(),
     createOwner = createOwnerToken,
@@ -106,6 +107,7 @@ class JobScheduler {
     this.repository = repository;
     this.enrichmentCoordinator = enrichmentCoordinator;
     this.syncService = syncService;
+    this.mediaService = mediaService;
     this.alarmClock = alarmClock;
     this.now = now;
     this.monotonicNow = monotonicNow;
@@ -149,6 +151,9 @@ class JobScheduler {
     }
     if (!backoff.blockedCode && Number.isFinite(schedule.nextByKind.push)) {
       candidates.push(Math.max(schedule.nextByKind.push, backoff.nextAttemptAt || 0));
+    }
+    if (!backoff.blockedCode && Number.isFinite(schedule.nextByKind.media)) {
+      candidates.push(Math.max(schedule.nextByKind.media, backoff.nextAttemptAt || 0));
     }
     if (candidates.length === 0) {
       await this.alarmClock.clear(this.alarmName);
@@ -201,12 +206,16 @@ class JobScheduler {
       return processed;
     }
     while (this.#hasBudget(startedAt, alreadyProcessed + processed)) {
-      const ownerToken = this.#nextOwner('push');
-      const job = await this.repository.claimDueJob('push', this.now(), ownerToken, this.leaseMs);
+      let job = await this.repository.claimDueJob('push', this.now(), this.#nextOwner('push'), this.leaseMs);
+      let service = this.syncService;
+      if (!job) {
+        job = await this.repository.claimDueJob('media', this.now(), this.#nextOwner('media'), this.leaseMs);
+        service = this.mediaService;
+      }
       if (!job) {
         break;
       }
-      const result = await this.syncService.processClaimedJob(job);
+      const result = await service.processClaimedJob(job);
       processed += 1;
       const code = result.error?.code;
       if (CONNECTIVITY_CODES.has(code)) {

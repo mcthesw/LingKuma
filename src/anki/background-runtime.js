@@ -1,9 +1,12 @@
 'use strict';
 
 const { AnkiConnectClient } = require('./anki-client');
+const { createSupertoneAudioProvider } = require('./audio-provider');
 const { CaptureService } = require('./capture-service');
 const { ContractError } = require('./contracts');
 const { EnrichmentCoordinator } = require('./enrichment');
+const { MediaService } = require('./media-service');
+const { MediaStore } = require('./media-store');
 const { createProviderAdapter } = require('./provider-adapter');
 const { openAnkiRepository } = require('./repository');
 const {
@@ -129,10 +132,21 @@ function initializeAnkiBackground({
       ankiClient,
       notifyCaptureChanged: captureNotifier.notify,
     });
+    const mediaService = new MediaService({
+      repository,
+      mediaStore: new MediaStore(repository),
+      audioProvider: createSupertoneAudioProvider({
+        storage: browserApi.storage?.local || { get: (_keys, callback) => callback({}) },
+        fetchImpl,
+      }),
+      ankiClient,
+      notifyCaptureChanged: captureNotifier.notify,
+    });
     const scheduler = new JobScheduler({
       repository,
       enrichmentCoordinator,
       syncService,
+      mediaService,
       alarmClock: new BrowserAlarmClock(browserApi),
     });
     const captureService = new CaptureService({
