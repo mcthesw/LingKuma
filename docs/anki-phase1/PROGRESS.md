@@ -13,7 +13,7 @@
 | T04 | PASS | 本任务提交 | `npm run test:anki`：协议/错误/timeout/loopback/redirect/profile及写请求单次尝试全部通过 | 本机AnkiConnect仍不可达，真实返回形状留T20 |
 | T05 | PASS | 本任务提交 | `npm run test:anki`：模板、兼容性、正确目标强调及恶意HTML/media/source输入全部通过 | 真实Anki卡片外观留T20 |
 | T06 | PASS | 本任务提交 | `npm run test:anki:integration`：立即持久化、重复/新语境、异常状态、编辑/再生成/排除/恢复13/13通过 | 暂未接网页UI，按任务留T13/T14 |
-| T07 | TODO | — | — | — |
+| T07 | PASS | 本任务提交 | `npm run test:anki`：结构化释义、注入边界、错误分类和Abort共53/53 unit通过 | 未调用真实AI，留T20 |
 | T08 | TODO | — | — | — |
 | T09 | TODO | — | — | — |
 | T10 | TODO | — | — | — |
@@ -126,6 +126,18 @@
 回归检查：构建成功且仅有原有体积警告；exclude原子取消本地任务但不删除capture/Anki，resume按当前状态恢复单一任务；服务不读取DOM或修改Known。
 提交：本任务提交。
 下一任务：T07，提取无DOM依赖的语境解释适配器。
+
+### T07
+
+实际基线：T00确认AI传输集中在后台 `handleAIRequest`，遗留a3自动路径带DOM和词汇副作用。
+修改文件：`src/anki/provider-adapter.js`、`background.js`、`tests/anki/unit/provider-adapter.test.js`、本记录。
+行为变化：新增无DOM的 `explainInContext`，复用既有后台provider配置/鉴权/请求；使用专用system协议与JSON材料，严格只接受meaning/句译/reading/usage；为既有transport增加可选AbortSignal，不改旧调用语义。
+测试命令：`npm run test:anki`。
+实际结果：unit 53/53、integration 13/13、e2e 1/1通过；有效meaning和缺省可选字段通过；坏JSON、额外deck/action字段、占位符拒绝；未配置/auth/429/中断分类正确；提示注入只作为JSON材料且请求不含URL、Cookie、词库或key。
+未运行的验收：未向用户配置的真实AI提供方发请求，真实provider留T20。
+回归检查：遗留 `makeAIRequest` message、用户自定义prompt和provider选择逻辑未改；构建成功且仅有原有体积警告；没有加载a3到worker或新增provider配置。
+提交：本任务提交。
+下一任务：T08，实现持久化释义任务及过期结果防护。
 
 ## 最终真实环境验收
 

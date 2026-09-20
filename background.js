@@ -2620,6 +2620,7 @@ function parseCustomRequestBody(customRequestBodyStr) {
 // AI 请求处理函数（避免 Firefox CSP 限制）
 // ============================
 async function handleAIRequest({ word, sentence, stream = false, messages, model = null, temperature = 1, tabId = null, isSidebarRequest = false }) {
+  const signal = arguments[0]?.signal;
   return new Promise((resolve, reject) => {
     chrome.storage.local.get(['aiConfig', 'customApiProfiles'], async (result) => {
       try {
@@ -2777,7 +2778,8 @@ async function handleAIRequest({ word, sentence, stream = false, messages, model
         const response = await fetch(config.apiBaseURL, {
           method: "POST",
           headers: headers,
-          body: JSON.stringify(requestBody)
+          body: JSON.stringify(requestBody),
+          signal: signal
         });
 
         if (!response.ok) {
